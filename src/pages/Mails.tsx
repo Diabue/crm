@@ -42,7 +42,8 @@ const Mails: React.FC = () => {
         } catch (error: any) {
             console.error("Sign in failed", error);
             const errorMsg = error?.error || error?.details || JSON.stringify(error);
-            alert(`Failed to sign in to Gmail: ${errorMsg}`);
+            const debugInfo = `\n\nDebug Info:\nOrigin: ${window.location.origin}\nClient ID: ${import.meta.env.VITE_GOOGLE_CLIENT_ID ? 'Loaded' : 'MISSING'}`;
+            alert(`Failed to sign in to Gmail: ${errorMsg}${debugInfo}`);
         }
     };
 
