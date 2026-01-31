@@ -139,19 +139,23 @@ const RequireAuth: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     return children;
 };
 
+import { ErrorBoundary } from './components/ErrorBoundary';
+
 const App: React.FC = () => {
     return (
         <Router>
-            <DashboardProvider>
-                <Routes>
-                    <Route path="/login" element={<Login />} />
-                    <Route path="/*" element={
-                        <RequireAuth>
-                            <DashboardLayout />
-                        </RequireAuth>
-                    } />
-                </Routes>
-            </DashboardProvider>
+            <ErrorBoundary>
+                <DashboardProvider>
+                    <Routes>
+                        <Route path="/login" element={<Login />} />
+                        <Route path="/*" element={
+                            <RequireAuth>
+                                <DashboardLayout />
+                            </RequireAuth>
+                        } />
+                    </Routes>
+                </DashboardProvider>
+            </ErrorBoundary>
         </Router>
     );
 };

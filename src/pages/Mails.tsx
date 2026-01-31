@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, Send, Brain, Sparkles, CheckCircle2, XCircle, RefreshCw, Briefcase } from 'lucide-react';
+import { Mail, Send, Brain, Sparkles, CheckCircle2, XCircle, RefreshCw, Briefcase, Loader2 } from 'lucide-react';
 import { Email, SentEmail, StatusBadgeProps } from '../types';
 import { useDashboard } from '../context/DashboardContext';
 import { supabase } from '../lib/supabase';
+import { GmailService } from '../services/gmail';
 
 const Mails: React.FC = () => {
     const { addLead } = useDashboard();
@@ -13,54 +14,86 @@ const Mails: React.FC = () => {
     const [inbox, setInbox] = useState<Email[]>([]);
     const [sentMails, setSentMails] = useState<SentEmail[]>([]);
 
+    const [isConnected, setIsConnected] = useState(false);
+    const [replyText, setReplyText] = useState('');
+    const [sending, setSending] = useState(false);
+
     useEffect(() => {
-        fetchEmails();
+        const initGmail = async () => {
+            try {
+                await GmailService.initialize();
+                const signedIn = GmailService.isSignedIn();
+                setIsConnected(signedIn);
+                if (signedIn) {
+                    fetchEmails();
+                }
+            } catch (error) {
+                console.error("Gmail init error", error);
+            }
+        };
+        initGmail();
     }, []);
 
+    const handleConnect = async () => {
+        try {
+            await GmailService.signIn();
+            setIsConnected(true);
+            fetchEmails();
+        } catch (error: any) {
+            console.error("Sign in failed", error);
+            const errorMsg = error?.error || error?.details || JSON.stringify(error);
+            alert(`Failed to sign in to Gmail: ${errorMsg}`);
+        }
+    };
+
     const fetchEmails = async () => {
+        if (!GmailService.isSignedIn()) return;
+
         setLoading(true);
-        const { data, error } = await supabase
-            .from('emails')
-            .select('*')
-            .order('created_at', { ascending: false });
+        try {
+            const messages = await GmailService.listMessages();
+            const emailDetails = await Promise.all(messages.map((msg: any) => GmailService.getMessage(msg.id)));
 
-        if (error) {
-            console.error('Error fetching emails:', error);
-        } else if (data) {
-            const received: Email[] = [];
-            const sent: SentEmail[] = [];
+            const processedEmails = emailDetails.map((e: any) => {
+                const from = GmailService.getHeader(e, 'From');
+                const subject = GmailService.getHeader(e, 'Subject');
+                const dateHeader = GmailService.getHeader(e, 'Date');
+                const body = GmailService.getBody(e);
 
-            data.forEach((e: any) => {
-                const date = new Date(e.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
-                if (e.direction === 'Inbound' || e.direction === 'Received') {
-                    received.push({
-                        id: e.id,
-                        from: e.sender || 'Unknown',
-                        company: 'Unknown', // Join with customer if possible
-                        subject: e.subject,
-                        excerpt: e.body?.substring(0, 50) + '...' || '',
-                        fullText: e.body || '',
-                        date: date,
-                        read: e.read || false,
-                        aiSummary: e.ai_summary || '',
-                        suggestedStatus: e.suggested_status as any,
-                        customerId: e.customer_id
-                    });
-                } else {
-                    sent.push({
-                        id: e.id,
-                        recipient: e.recipient || e.sender || 'Unknown',
-                        subject: e.subject,
-                        date: date,
-                        status: e.status || 'Sent'
-                    });
-                }
+                // Simple determination of direction based on "me" (needs refinement in real app)
+                const isSent = from.includes('<me@') || from.includes('Me'); // Basic check, better to check against user profile email
+
+                return {
+                    id: e.id,
+                    from: from.split('<')[0].replace(/"/g, '').trim(),
+                    company: 'Gmail Contact', // Placeholder
+                    subject: subject,
+                    excerpt: body.substring(0, 50) + '...',
+                    fullText: body,
+                    date: new Date(dateHeader).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }),
+                    read: !e.labelIds?.includes('UNREAD'),
+                    aiSummary: 'Fetched from Gmail',
+                    suggestedStatus: 'Potential' as any,
+                    direction: (isSent ? 'Outbound' : 'Inbound') as 'Outbound' | 'Inbound'
+                };
             });
+
+            const received = processedEmails.filter((e: any) => e.direction === 'Inbound');
+            const sent = processedEmails.filter((e: any) => e.direction === 'Outbound').map((e: any) => ({
+                id: e.id,
+                recipient: 'Recipient', // Need to parse 'To' header
+                subject: e.subject,
+                date: e.date,
+                status: 'Sent' as any
+            }));
 
             setInbox(received);
             setSentMails(sent);
+        } catch (error) {
+            console.error('Error fetching emails:', error);
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
 
@@ -96,6 +129,26 @@ const Mails: React.FC = () => {
         }
 
         setSimulating(false);
+    };
+
+    const handleSendReply = async () => {
+        if (!selectedMail || !replyText.trim()) return;
+        setSending(true);
+        try {
+            await GmailService.sendEmail(
+                selectedMail.from, // Ideally use the raw email address
+                `Re: ${selectedMail.subject}`,
+                replyText
+            );
+            alert('Reply sent successfully!');
+            setReplyText('');
+            // Optionally refresh sent items or add to local list
+        } catch (error) {
+            console.error('Failed to send reply:', error);
+            alert('Failed to send reply.');
+        } finally {
+            setSending(false);
+        }
     };
 
     const handleStatusUpdate = async (status: string) => {
@@ -136,15 +189,26 @@ const Mails: React.FC = () => {
                     <p className="text-text-secondary">Monitor campaigns - Realtime DB connected</p>
                 </div>
 
-                {/* Simulation Controls (Dev Mode) */}
-                <button
-                    onClick={simulateIncomingReply}
-                    disabled={simulating}
-                    className="flex items-center gap-2 bg-surface border border-border hover:border-primary/50 text-text-secondary hover:text-white px-4 py-2 rounded-xl transition-all font-mono text-sm"
-                >
-                    {simulating ? <RefreshCw className="animate-spin" size={16} /> : <Sparkles size={16} className="text-accent" />}
-                    {simulating ? 'Saving to DB...' : 'Dev: Simulate Reply'}
-                </button>
+                {/* Action Buttons */}
+                <div className="flex gap-3">
+                    {!isConnected && (
+                        <button
+                            onClick={handleConnect}
+                            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl transition-all font-medium text-sm shadow-lg shadow-blue-500/20"
+                        >
+                            <Mail size={16} />
+                            Connect Gmail
+                        </button>
+                    )}
+                    <button
+                        onClick={simulateIncomingReply}
+                        disabled={simulating}
+                        className="flex items-center gap-2 bg-surface border border-border hover:border-primary/50 text-text-secondary hover:text-white px-4 py-2 rounded-xl transition-all font-mono text-sm"
+                    >
+                        {simulating ? <RefreshCw className="animate-spin" size={16} /> : <Sparkles size={16} className="text-accent" />}
+                        {simulating ? 'Saving to DB...' : 'Dev: Simulate Reply'}
+                    </button>
+                </div>
             </div>
 
             {/* Tabs */}
@@ -288,10 +352,16 @@ const Mails: React.FC = () => {
                                 <textarea
                                     placeholder="Type your reply..."
                                     rows={1}
+                                    value={replyText}
+                                    onChange={(e) => setReplyText(e.target.value)}
                                     className="flex-1 bg-surface border border-border rounded-xl px-4 py-3 text-sm text-white focus:border-primary/50 outline-none resize-none"
                                 />
-                                <button className="bg-primary hover:bg-primary/90 text-white p-3 rounded-xl transition-colors">
-                                    <Send size={18} />
+                                <button
+                                    onClick={handleSendReply}
+                                    disabled={sending || !replyText.trim()}
+                                    className="bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-white p-3 rounded-xl transition-colors"
+                                >
+                                    {sending ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />}
                                 </button>
                             </div>
                         </>

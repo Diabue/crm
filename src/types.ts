@@ -10,7 +10,7 @@ export interface Customer {
 }
 
 export interface Email {
-    id: number;
+    id: string;
     from: string;
     company: string;
     subject: string;
@@ -21,10 +21,11 @@ export interface Email {
     aiSummary: string;
     suggestedStatus: 'Potential' | 'Cold' | 'Customer';
     customerId?: number;
+    direction: 'Inbound' | 'Outbound'; // Added to match usage in Mails.tsx
 }
 
 export interface SentEmail {
-    id: number;
+    id: string;
     subject: string;
     recipient: string;
     date: string;
