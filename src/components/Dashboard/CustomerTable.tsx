@@ -1,7 +1,16 @@
 import React from 'react';
 import { MoreVertical } from 'lucide-react';
 
-const customers = [
+interface Customer {
+    id: number;
+    name: string;
+    contact: string;
+    avatar: string;
+    value: string;
+    status: 'Active' | 'Negotiation' | 'Closed' | 'Pending';
+}
+
+const customers: Customer[] = [
     { id: 1, name: 'Acme Corp', contact: 'John Doe', avatar: 'https://i.pravatar.cc/150?u=1', value: '$120,000', status: 'Active' },
     { id: 2, name: 'Global Tech', contact: 'Alice Smith', avatar: 'https://i.pravatar.cc/150?u=2', value: '$85,500', status: 'Negotiation' },
     { id: 3, name: 'Stark Ind', contact: 'Tony S.', avatar: 'https://i.pravatar.cc/150?u=3', value: '$250,000', status: 'Closed' },
@@ -9,14 +18,14 @@ const customers = [
     { id: 5, name: 'Cyberdyne', contact: 'Sarah C.', avatar: 'https://i.pravatar.cc/150?u=5', value: '$95,000', status: 'Pending' },
 ];
 
-const statusStyles = {
+const statusStyles: Record<Customer['status'], string> = {
     Active: 'bg-emerald-500/10 text-emerald-500',
     Negotiation: 'bg-amber-500/10 text-amber-500',
     Closed: 'bg-blue-500/10 text-blue-500',
     Pending: 'bg-zinc-500/10 text-zinc-400',
 };
 
-const CustomerTable = () => {
+const CustomerTable: React.FC = () => {
     return (
         <div className="glass-card p-6 h-full flex flex-col">
             <div className="flex justify-between items-center mb-6">
@@ -48,7 +57,7 @@ const CustomerTable = () => {
                                     </div>
                                 </td>
                                 <td className="py-3">
-                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusStyles[customer.status] || statusStyles.Pending}`}>
+                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusStyles[customer.status]}`}>
                                         {customer.status}
                                     </span>
                                 </td>

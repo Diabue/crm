@@ -5,6 +5,13 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --color-primary: 124 58 237;
+    /* Default Purple */
+  }
+}
+
+@layer base {
   body {
     @apply bg-background text-text-main font-sans antialiased;
   }

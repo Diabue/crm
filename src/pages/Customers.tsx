@@ -1,29 +1,39 @@
 import React, { useState } from 'react';
-import { Mail, Search, Filter, MoreVertical, Send, CheckCircle2 } from 'lucide-react';
+import { Mail, Search, Send, Trash2 } from 'lucide-react';
 
-const Customers = () => {
-    const [showCampaignModal, setShowCampaignModal] = useState(false);
-    const [activeTab, setActiveTab] = useState('All');
+import { useDashboard } from '../context/DashboardContext'; // Assuming useDashboard is imported from here
 
-    // Mock Data
-    const [customers] = useState([
-        { id: 1, name: 'Acme Corp', contact: 'John Doe', email: 'john@acme.com', status: 'Customer', lastContact: '2 days ago' },
-        { id: 2, name: 'TechFlow Inc', contact: 'Sarah Smith', email: 'sarah@techflow.com', status: 'Potential', lastContact: '5 hours ago' },
-        { id: 3, name: 'Global Systems', contact: 'Mike Johnson', email: 'mike@global.com', status: 'Cold', lastContact: '1 week ago' },
-        { id: 4, name: 'Stark Ind', contact: 'Tony Stark', email: 'tony@stark.com', status: 'Refused', lastContact: '3 days ago' },
-        { id: 5, name: 'Wayne Ent', contact: 'Bruce Wayne', email: 'bruce@wayne.com', status: 'Customer', lastContact: '1 day ago' },
-    ]);
+type CustomerStatus = 'Customer' | 'Potential' | 'Cold' | 'Refused';
 
-    const statusColors = {
+const Customers: React.FC = () => {
+    const { deleteCustomer, customers } = useDashboard(); // Use global customers
+    const [showCampaignModal, setShowCampaignModal] = useState<boolean>(false);
+    const [activeTab, setActiveTab] = useState<'All' | CustomerStatus>('All');
+
+    // Remove local state and useEffect fetching
+    // const [customers, setCustomers] = useState<Customer[]>([]);
+    // const [loading, setLoading] = useState(true);
+
+    const handleDelete = async (id: number) => {
+        if (confirm('Are you sure you want to delete this customer?')) {
+            await deleteCustomer(id);
+            // Global state updates automatically via deleteCustomer calling setCustomers
+        }
+    };
+
+    const statusColors: Record<string, string> = {
         Customer: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
         Potential: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
         Cold: 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20',
         Refused: 'bg-red-500/10 text-red-500 border-red-500/20',
+        Lead: 'bg-purple-500/10 text-purple-500 border-purple-500/20',
     };
 
     const filteredCustomers = activeTab === 'All'
         ? customers
         : customers.filter(c => c.status === activeTab);
+
+
 
     return (
         <div className="space-y-6 h-full flex flex-col">
@@ -53,7 +63,7 @@ const Customers = () => {
                     />
                 </div>
                 <div className="flex bg-surface border border-border rounded-xl p-1">
-                    {['All', 'Customer', 'Potential', 'Cold'].map(tab => (
+                    {(['All', 'Customer', 'Potential', 'Cold'] as const).map(tab => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
@@ -73,8 +83,8 @@ const Customers = () => {
                         <thead className="sticky top-0 bg-surface/95 backdrop-blur-sm z-10">
                             <tr className="text-xs text-text-secondary border-b border-border">
                                 <th className="py-4 pl-6 font-medium">Customer</th>
-                                <th className="py-4 font-medium">Contact</th>
                                 <th className="py-4 font-medium">Status</th>
+                                <th className="py-4 font-medium">Value</th>
                                 <th className="py-4 font-medium">Last Contact</th>
                                 <th className="py-4 pr-6 text-right">Actions</th>
                             </tr>
@@ -86,16 +96,20 @@ const Customers = () => {
                                         <div className="font-medium text-white">{customer.name}</div>
                                         <div className="text-xs text-text-secondary">{customer.email}</div>
                                     </td>
-                                    <td className="py-3 text-text-secondary">{customer.contact}</td>
                                     <td className="py-3">
                                         <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${statusColors[customer.status]}`}>
                                             {customer.status}
                                         </span>
                                     </td>
+                                    <td className="py-3 text-text-secondary">{customer.value}</td>
                                     <td className="py-3 text-text-secondary">{customer.lastContact}</td>
                                     <td className="py-3 pr-6 text-right">
-                                        <button className="text-text-secondary hover:text-white p-1 rounded-lg hover:bg-surface-highlight transition-colors">
-                                            <MoreVertical size={18} />
+                                        <button
+                                            onClick={() => handleDelete(customer.id)}
+                                            className="text-text-secondary hover:text-red-400 p-1 rounded-lg hover:bg-surface-highlight transition-colors"
+                                            title="Delete Customer"
+                                        >
+                                            <Trash2 size={18} />
                                         </button>
                                     </td>
                                 </tr>
@@ -124,7 +138,7 @@ const Customers = () => {
                                     <select className="bg-background border border-border rounded-xl px-4 py-2.5 text-white w-full focus:border-primary/50 outline-none">
                                         <option>All Leads (543)</option>
                                         <option>Cold Leads (320)</option>
-                                        <option>Potential Customes (120)</option>
+                                        <option>Potential Customers (120)</option>
                                     </select>
                                 </div>
                             </div>

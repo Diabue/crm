@@ -1,22 +1,28 @@
 import React from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { useDashboard } from '../../context/DashboardContext';
 
-const data = [
-    { name: 'Jan', revenue: 4000, profit: 2400 },
-    { name: 'Feb', revenue: 3000, profit: 1398 },
-    { name: 'Mar', revenue: 2000, profit: 9800 },
-    { name: 'Apr', revenue: 2780, profit: 3908 },
-    { name: 'May', revenue: 1890, profit: 4800 },
-    { name: 'Jun', revenue: 2390, profit: 3800 },
-    { name: 'Jul', revenue: 3490, profit: 4300 },
-    { name: 'Aug', revenue: 4200, profit: 5100 },
-    { name: 'Sep', revenue: 5100, profit: 6200 },
-    { name: 'Oct', revenue: 6100, profit: 6900 },
-    { name: 'Nov', revenue: 5800, profit: 6200 },
-    { name: 'Dec', revenue: 7200, profit: 8100 },
-];
+const RevenueChart: React.FC = () => {
+    const { deals } = useDashboard();
 
-const RevenueChart = () => {
+    // Aggregate revenue by month
+    const monthlyRevenue = new Array(12).fill(0);
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    deals.forEach(deal => {
+        if (deal.status === 'Won') {
+            const date = deal.date ? new Date(deal.date) : new Date(); // Fallback to now if no date
+            const monthIndex = date.getMonth();
+            monthlyRevenue[monthIndex] += deal.value;
+        }
+    });
+
+    const data = months.map((name, index) => ({
+        name,
+        revenue: monthlyRevenue[index],
+        profit: monthlyRevenue[index] * 0.4, // Mock profit margin
+    }));
+
     return (
         <div className="glass-card p-6 h-full flex flex-col">
             <div className="flex justify-between items-center mb-6">
@@ -55,7 +61,7 @@ const RevenueChart = () => {
                         <YAxis
                             stroke="#525252"
                             tick={{ fill: '#737373', fontSize: 12 }}
-                            tickFormatter={(value) => `$${value}`}
+                            tickFormatter={(value: number) => `$${value}`}
                             tickLine={false}
                             axisLine={false}
                             dx={-10}

@@ -7,12 +7,22 @@ import {
     CheckSquare,
     Settings,
     LogOut,
-    Mail
+    Mail,
+    LucideIcon
 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { SidebarProps } from '../types';
 
-const Sidebar = ({ active, setActive }) => {
-    const navItems = [
+interface NavItem {
+    name: string;
+    icon: LucideIcon;
+}
+
+import { useDashboard } from '../context/DashboardContext';
+
+const Sidebar: React.FC<SidebarProps> = ({ active, setActive }) => {
+    const { userProfile } = useDashboard();
+    const navItems: NavItem[] = [
         { name: 'Home', icon: LayoutDashboard },
         { name: 'Mails', icon: Mail },
         { name: 'Analytics', icon: BarChart2 },
@@ -29,7 +39,7 @@ const Sidebar = ({ active, setActive }) => {
                 <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
                     <div className="w-4 h-4 bg-white rounded-full opacity-80" />
                 </div>
-                <span className="text-xl font-bold tracking-tight text-white">Brisk.</span>
+                <span className="text-xl font-bold tracking-tight text-white">Dashboard</span>
             </div>
 
             {/* Navigation */}
@@ -60,12 +70,16 @@ const Sidebar = ({ active, setActive }) => {
             {/* User Profile */}
             <div className="p-4 border-t border-border">
                 <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-surface-highlight cursor-pointer transition-colors">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-primary to-accent overflow-hidden border-2 border-surface">
-                        <img src="https://i.pravatar.cc/150?u=a042581f4e29026024d" alt="User" className="w-full h-full object-cover" />
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-primary to-accent overflow-hidden border-2 border-surface flex items-center justify-center relative">
+                        {userProfile.avatar ? (
+                            <img src={userProfile.avatar} alt="Avatar" className="w-full h-full object-cover" />
+                        ) : (
+                            <Users size={20} className="text-white opacity-80" />
+                        )}
                     </div>
                     <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-white truncate">Alex Morgan</p>
-                        <p className="text-xs text-text-secondary truncate">Product Lead</p>
+                        <p className="text-sm font-semibold text-white truncate">{userProfile.name}</p>
+                        <p className="text-xs text-text-secondary truncate">{userProfile.role}</p>
                     </div>
                     <LogOut size={16} className="text-text-secondary hover:text-white" />
                 </div>

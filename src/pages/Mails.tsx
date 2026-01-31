@@ -1,59 +1,122 @@
-import React, { useState } from 'react';
-import { Mail, Send, Reply, Brain, Sparkles, CheckCircle2, XCircle, ChevronRight, RefreshCw, User, Briefcase } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Mail, Send, Brain, Sparkles, CheckCircle2, XCircle, RefreshCw, Briefcase } from 'lucide-react';
+import { Email, SentEmail, StatusBadgeProps } from '../types';
+import { useDashboard } from '../context/DashboardContext';
+import { supabase } from '../lib/supabase';
 
-const Mails = () => {
-    const [activeTab, setActiveTab] = useState('Replied'); // 'Sent' or 'Replied'
-    const [selectedMail, setSelectedMail] = useState(null);
-    const [simulating, setSimulating] = useState(false);
+const Mails: React.FC = () => {
+    const { addLead } = useDashboard();
+    const [activeTab, setActiveTab] = useState<'Replied' | 'Sent'>('Replied');
+    const [selectedMail, setSelectedMail] = useState<Email | null>(null);
+    const [simulating, setSimulating] = useState<boolean>(false);
+    const [loading, setLoading] = useState<boolean>(true);
+    const [inbox, setInbox] = useState<Email[]>([]);
+    const [sentMails, setSentMails] = useState<SentEmail[]>([]);
 
-    // Mock Sent Mails
-    const [sentMails] = useState([
-        { id: 101, subject: 'Partnership Opportunity', recipient: 'ceo@techflow.com', date: '2 days ago', status: 'Sent' },
-        { id: 102, subject: 'Q3 Product Update', recipient: 'marketing@global.com', date: '1 week ago', status: 'Opened' },
-        { id: 103, subject: 'Exclusive Invite', recipient: 'john@acme.com', date: '3 hours ago', status: 'Clicked' },
-    ]);
+    useEffect(() => {
+        fetchEmails();
+    }, []);
 
-    // Mock Replied Mails (Inbox)
-    const [inbox, setInbox] = useState([
-        {
-            id: 1,
-            from: 'Sarah Smith',
-            company: 'TechFlow Inc',
-            subject: 'Re: Partnership Opportunity',
-            excerpt: 'Thanks for reaching out! We are definitely interested in...',
-            fullText: "Hi Alex,\n\nThanks for reaching out! We are definitely interested in hearing more about your solution. It seems to align perfectly with our Q4 goals.\n\nCould we jump on a quick call next Tuesday at 10 AM?\n\nBest,\nSarah",
-            date: '10 mins ago',
-            read: false,
-            aiSummary: 'Positive interest. Wants to schedule a call next Tuesday.',
-            suggestedStatus: 'Potential'
+    const fetchEmails = async () => {
+        setLoading(true);
+        const { data, error } = await supabase
+            .from('emails')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('Error fetching emails:', error);
+        } else if (data) {
+            const received: Email[] = [];
+            const sent: SentEmail[] = [];
+
+            data.forEach((e: any) => {
+                const date = new Date(e.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
+                if (e.direction === 'Inbound' || e.direction === 'Received') {
+                    received.push({
+                        id: e.id,
+                        from: e.sender || 'Unknown',
+                        company: 'Unknown', // Join with customer if possible
+                        subject: e.subject,
+                        excerpt: e.body?.substring(0, 50) + '...' || '',
+                        fullText: e.body || '',
+                        date: date,
+                        read: e.read || false,
+                        aiSummary: e.ai_summary || '',
+                        suggestedStatus: e.suggested_status as any,
+                        customerId: e.customer_id
+                    });
+                } else {
+                    sent.push({
+                        id: e.id,
+                        recipient: e.recipient || e.sender || 'Unknown',
+                        subject: e.subject,
+                        date: date,
+                        status: e.status || 'Sent'
+                    });
+                }
+            });
+
+            setInbox(received);
+            setSentMails(sent);
         }
-    ]);
-
-    // Simulation Logic
-    const simulateIncomingReply = () => {
-        setSimulating(true);
-        setTimeout(() => {
-            const newMail = {
-                id: Date.now(),
-                from: 'Mike Johnson',
-                company: 'Global Systems',
-                subject: 'Re: Q3 Product Update',
-                excerpt: 'I am not interested right now, please remove me...',
-                fullText: "Hello,\n\nPlease stop emailing me. We already have a vendor for this and are not looking to switch.\n\nThanks,\nMike",
-                date: 'Just now',
-                read: false,
-                aiSummary: 'Negative sentiment. Explicitly asked to be removed.',
-                suggestedStatus: 'Cold'
-            };
-            setInbox([newMail, ...inbox]);
-            setSimulating(false);
-            // Auto-select the new mail for demo purposes
-            setSelectedMail(newMail);
-        }, 1500);
+        setLoading(false);
     };
 
-    const StatusBadge = ({ status }) => {
-        const colors = {
+
+    // Simulation Logic: Add real email to DB
+    const simulateIncomingReply = async (): Promise<void> => {
+        setSimulating(true);
+
+        // Simulate network delay
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        const body = "Hello,\n\nI'm looking for a CRM solution. Can you send me your pricing list?\n\nRegards,\nJohn";
+        const newMail = {
+            sender: 'New Lead',
+            recipient: 'me@company.com',
+            subject: 'Inquiry about pricing',
+            body: body,
+            read: false,
+            ai_summary: 'Pricing inquiry. High intent.',
+            suggested_status: 'Potential',
+            direction: 'Inbound',
+            status: 'Received',
+            user_id: (await supabase.auth.getUser()).data.user?.id
+        };
+
+        const { error } = await supabase.from('emails').insert([newMail]);
+
+        if (!error) {
+            addLead();
+            await fetchEmails();
+        } else {
+            console.error(error);
+            alert('Error simulating reply');
+        }
+
+        setSimulating(false);
+    };
+
+    const handleStatusUpdate = async (status: string) => {
+        if (!selectedMail?.customerId) return;
+
+        // Update customer status in DB
+        const { error } = await supabase
+            .from('customers')
+            .update({ status })
+            .eq('id', selectedMail.customerId);
+
+        if (error) {
+            console.error(error);
+            alert('Error updating status');
+        } else {
+            alert(`Customer status updated to ${status}`);
+        }
+    };
+
+    const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
+        const colors: Record<string, string> = {
             'Potential': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
             'Cold': 'bg-red-500/20 text-red-400 border-red-500/30',
             'Customer': 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
@@ -70,7 +133,7 @@ const Mails = () => {
             <div className="flex justify-between items-center">
                 <div>
                     <h1 className="text-2xl font-bold text-white">Mail Automation</h1>
-                    <p className="text-text-secondary">Monitor campaigns and AI responses</p>
+                    <p className="text-text-secondary">Monitor campaigns - Realtime DB connected</p>
                 </div>
 
                 {/* Simulation Controls (Dev Mode) */}
@@ -80,13 +143,13 @@ const Mails = () => {
                     className="flex items-center gap-2 bg-surface border border-border hover:border-primary/50 text-text-secondary hover:text-white px-4 py-2 rounded-xl transition-all font-mono text-sm"
                 >
                     {simulating ? <RefreshCw className="animate-spin" size={16} /> : <Sparkles size={16} className="text-accent" />}
-                    {simulating ? 'Simulating AI...' : 'Dev: Simulate Reply'}
+                    {simulating ? 'Saving to DB...' : 'Dev: Simulate Reply'}
                 </button>
             </div>
 
             {/* Tabs */}
             <div className="flex gap-6 border-b border-border">
-                {['Replied', 'Sent'].map(tab => (
+                {(['Replied', 'Sent'] as const).map(tab => (
                     <button
                         key={tab}
                         onClick={() => setActiveTab(tab)}
@@ -113,25 +176,31 @@ const Mails = () => {
                         />
                     </div>
                     <div className="flex-1 overflow-y-auto">
-                        {activeTab === 'Replied' ? (
-                            inbox.map(mail => (
-                                <div
-                                    key={mail.id}
-                                    onClick={() => setSelectedMail(mail)}
-                                    className={`p-4 border-b border-border/30 cursor-pointer transition-colors hover:bg-surface-highlight/50 ${selectedMail?.id === mail.id ? 'bg-surface-highlight border-l-2 border-l-primary' : ''
-                                        } ${!mail.read ? 'bg-primary/5' : ''}`}
-                                >
-                                    <div className="flex justify-between mb-1">
-                                        <span className={`text-sm font-semibold ${!mail.read ? 'text-white' : 'text-text-secondary'}`}>{mail.from}</span>
-                                        <span className="text-xs text-text-secondary">{mail.date}</span>
+                        {loading && activeTab === 'Replied' ? (
+                            <div className="p-8 text-center text-text-secondary">Loading emails...</div>
+                        ) : activeTab === 'Replied' ? (
+                            inbox.length === 0 ? (
+                                <div className="p-8 text-center text-text-secondary">No emails yet. Simulate one!</div>
+                            ) : (
+                                inbox.map(mail => (
+                                    <div
+                                        key={mail.id}
+                                        onClick={() => setSelectedMail(mail)}
+                                        className={`p-4 border-b border-border/30 cursor-pointer transition-colors hover:bg-surface-highlight/50 ${selectedMail?.id === mail.id ? 'bg-surface-highlight border-l-2 border-l-primary' : ''
+                                            } ${!mail.read ? 'bg-primary/5' : ''}`}
+                                    >
+                                        <div className="flex justify-between mb-1">
+                                            <span className={`text-sm font-semibold ${!mail.read ? 'text-white' : 'text-text-secondary'}`}>{mail.from}</span>
+                                            <span className="text-xs text-text-secondary">{mail.date}</span>
+                                        </div>
+                                        <div className="text-xs text-text-secondary mb-1 flex items-center gap-2">
+                                            <Briefcase size={12} /> {mail.company}
+                                        </div>
+                                        <p className="text-sm text-text-secondary truncate">{mail.subject}</p>
+                                        <p className="text-xs text-muted mt-1 truncate">{mail.excerpt}</p>
                                     </div>
-                                    <div className="text-xs text-text-secondary mb-1 flex items-center gap-2">
-                                        <Briefcase size={12} /> {mail.company}
-                                    </div>
-                                    <p className="text-sm text-text-secondary truncate">{mail.subject}</p>
-                                    <p className="text-xs text-muted mt-1 truncate">{mail.excerpt}</p>
-                                </div>
-                            ))
+                                ))
+                            )
                         ) : (
                             sentMails.map(mail => (
                                 <div key={mail.id} className="p-4 border-b border-border/30">
@@ -198,7 +267,10 @@ const Mails = () => {
                                         <p className="text-sm text-text-secondary mb-3">{selectedMail.aiSummary}</p>
 
                                         <div className="flex gap-3">
-                                            <button className="flex items-center gap-2 bg-primary/20 hover:bg-primary/30 border border-primary/50 text-primary-300 hover:text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
+                                            <button
+                                                onClick={() => handleStatusUpdate(selectedMail.suggestedStatus)}
+                                                className="flex items-center gap-2 bg-primary/20 hover:bg-primary/30 border border-primary/50 text-primary-300 hover:text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+                                            >
                                                 <CheckCircle2 size={14} />
                                                 Accept "{selectedMail.suggestedStatus}"
                                             </button>

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Search, Bell, Plus } from 'lucide-react';
 
-const Header = () => {
+const Header: React.FC = () => {
     return (
         <header className="h-20 px-8 flex items-center justify-between sticky top-0 z-40 bg-background/80 backdrop-blur-md border-b border-border/50">
             {/* Search */}

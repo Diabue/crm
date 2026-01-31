@@ -1,8 +1,21 @@
 import React from 'react';
-import { ArrowUpRight, ArrowDownRight, MoreHorizontal } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, MoreHorizontal, LucideIcon } from 'lucide-react';
 import { LineChart, Line, ResponsiveContainer } from 'recharts';
 
-const StatCard = ({ title, value, change, trend, data, icon: Icon }) => {
+interface SparkData {
+    value: number;
+}
+
+interface StatCardProps {
+    title: string;
+    value: string;
+    change: string;
+    trend: 'up' | 'down';
+    data?: SparkData[];
+    icon: LucideIcon;
+}
+
+const StatCard: React.FC<StatCardProps> = ({ title, value, change, trend, data, icon: Icon }) => {
     const isPositive = trend === 'up';
 
     return (

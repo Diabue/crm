@@ -11,8 +11,8 @@ export default {
                 surface: "#141414",
                 "surface-highlight": "#1C1C1C",
                 border: "#262626",
-                primary: "#7C3AED", // Electric vivid purple
-                "primary-glow": "rgba(124, 58, 237, 0.5)",
+                primary: "rgb(var(--color-primary) / <alpha-value>)", // Dynamic variable
+                "primary-glow": "rgb(var(--color-primary) / 0.5)",
                 secondary: "#10B981",
                 accent: "#3B82F6", // Blue
                 muted: "#737373",

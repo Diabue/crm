@@ -1,18 +1,20 @@
 import React, { useState } from 'react';
 import { CheckCircle2, Circle, Calendar } from 'lucide-react';
 
-const initialTasks = [
-    { id: 1, title: 'Review Q3 Marketing Strategy', due: 'Today', completed: false, tag: 'Marketing' },
-    { id: 2, title: 'Client Meeting with Apex Corp', due: 'Tomorrow', completed: false, tag: 'Sales' },
-    { id: 3, title: 'Update Revenue Projections', due: 'Oct 24', completed: true, tag: 'Finance' },
-    { id: 4, title: 'Team Performance Review', due: 'Oct 25', completed: false, tag: 'HR' },
-    { id: 5, title: 'Prepare Board Presentation', due: 'Oct 28', completed: false, tag: 'Admin' },
-];
+interface Task {
+    id: number;
+    title: string;
+    due: string;
+    completed: boolean;
+    tag: string;
+}
 
-const TaskList = () => {
-    const [tasks, setTasks] = useState(initialTasks);
+const initialTasks: Task[] = [];
 
-    const toggleTask = (id) => {
+const TaskList: React.FC = () => {
+    const [tasks, setTasks] = useState<Task[]>(initialTasks);
+
+    const toggleTask = (id: number): void => {
         setTasks(tasks.map(task =>
             task.id === id ? { ...task, completed: !task.completed } : task
         ));
