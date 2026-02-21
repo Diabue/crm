@@ -7,5 +7,8 @@ export default defineConfig({
     server: {
         port: 5174,
         host: true
+    },
+    optimizeDeps: {
+        include: ['react-quill-new', 'date-fns', 'lucide-react']
     }
 })

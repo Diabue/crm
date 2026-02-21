@@ -25,6 +25,11 @@ interface DashboardContextType extends DashboardState {
     toggleTask: (id: number) => void;
     resetDashboard: () => void;
     deleteCustomer: (id: number) => void;
+    addCustomer: (customer: Omit<Customer, 'id' | 'value' | 'lastContact'>) => void;
+    updateCustomerStatus: (id: number, status: Customer['status']) => void;
+    updateCustomer: (id: number, data: Partial<Customer>) => void; // New
+    updateDeal: (id: number, data: Partial<Deal>) => void; // New
+    updateTask: (id: number, data: Partial<Task>) => void; // New
     deleteTask: (id: number) => void;
     clearAllTasks: () => void;
     autoCleanupTasks: boolean;
@@ -83,27 +88,108 @@ export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children 
         };
     });
 
-    // Sync Auth with Profile
-    useEffect(() => {
-        const syncProfile = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user && user.user_metadata) {
-                const { full_name, avatar_url, role } = user.user_metadata;
-                if (full_name || avatar_url || role) {
-                    setUserProfile(prev => {
-                        const updated = {
-                            ...prev,
-                            name: full_name || prev.name,
-                            avatar: avatar_url || prev.avatar,
-                            role: role || prev.role
-                        };
-                        localStorage.setItem('userProfile', JSON.stringify(updated));
-                        return updated;
-                    });
-                }
+    // Sync Auth with Profile & Fetch Data
+    const syncProfile = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user && user.user_metadata) {
+            const { full_name, avatar_url, role } = user.user_metadata;
+            if (full_name || avatar_url || role) {
+                setUserProfile(prev => {
+                    const updated = {
+                        ...prev,
+                        name: full_name || prev.name,
+                        avatar: avatar_url || prev.avatar,
+                        role: role || prev.role
+                    };
+                    localStorage.setItem('userProfile', JSON.stringify(updated));
+                    return updated;
+                });
             }
-        };
+
+            // Sync Settings
+            if (user.user_metadata?.settings) {
+                setAppSettings(prev => {
+                    const merged = { ...prev, ...user.user_metadata.settings };
+                    localStorage.setItem('appSettings', JSON.stringify(merged));
+                    return merged;
+                });
+            }
+        }
+    };
+
+    const fetchData = async () => {
+        console.log('Fetching dashboard data...');
+
+        // Fetch Deals
+        const { data: dealsData, error: dealsError } = await supabase
+            .from('deals')
+            .select('*')
+            .order('id', { ascending: false });
+
+        if (dealsError) console.error('Error fetching deals:', dealsError);
+        else if (dealsData) {
+            setDeals(dealsData.map((d: any) => ({
+                ...d,
+                customerId: d.customer_id,
+            })));
+        }
+
+        // Fetch Tasks
+        const { data: tasksData, error: tasksError } = await supabase
+            .from('tasks')
+            .select('*')
+            .order('id', { ascending: false });
+
+        if (tasksError) console.error('Error fetching tasks:', tasksError);
+        else if (tasksData) {
+            setTasks(tasksData.map((t: any) => ({
+                ...t,
+                dealId: t.deal_id,
+                dueDate: t.due_date,
+            })));
+        }
+
+        // Fetch Customers
+        const { data: customersData, error: customersError } = await supabase
+            .from('customers')
+            .select('*')
+            .order('id', { ascending: false });
+
+        if (customersError) console.error('Error fetching customers:', customersError);
+        else if (customersData) {
+            const formattedCustomers: Customer[] = customersData.map((c: any) => ({
+                id: c.id,
+                name: c.name,
+                email: c.email || '',
+                status: c.status,
+                company: c.company || '',
+                value: '$0',
+                lastContact: c.last_contact_at ? new Date(c.last_contact_at).toLocaleDateString() : 'Never',
+            }));
+            setCustomers(formattedCustomers);
+        }
+    };
+
+    useEffect(() => {
+        // Initial load
         syncProfile();
+        fetchData();
+
+        // Listen for auth changes (Login, Logout)
+        const { data: authListener } = supabase.auth.onAuthStateChange((event, _session) => {
+            if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+                console.log('Auth changed:', event, '- Refetching data');
+                syncProfile();
+                fetchData();
+            } else if (event === 'SIGNED_OUT') {
+                // Optional: Clear state on logout
+                // setDeals([]); setTasks([]); setCustomers([]);
+            }
+        });
+
+        return () => {
+            authListener.subscription.unsubscribe();
+        };
     }, []);
 
     // Color Theme Effect
@@ -128,21 +214,112 @@ export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children 
         });
     };
 
-    const updateUserProfile = (newProfile: Partial<UserProfile>) => {
+    const updateUserProfile = async (newProfile: Partial<UserProfile>) => {
         setUserProfile(prev => {
             const updated = { ...prev, ...newProfile };
             localStorage.setItem('userProfile', JSON.stringify(updated));
             return updated;
         });
+
+        // Persist to Supabase Auth Metadata
+        const { error } = await supabase.auth.updateUser({
+            data: {
+                full_name: newProfile.name, // Will be merged/overwritten if present
+                role: newProfile.role,
+                avatar_url: newProfile.avatar
+            }
+        });
+
+        if (error) {
+            console.error('Error updating profile in Supabase:', error);
+        }
     };
 
-    const updateAppSettings = (newSettings: Partial<AppSettings>) => {
+    const updateAppSettings = async (newSettings: Partial<AppSettings>) => {
         setAppSettings(prev => {
             const updated = { ...prev, ...newSettings };
             // Ensure currency updates propagate immediately if dependent logic existed (none yet)
             localStorage.setItem('appSettings', JSON.stringify(updated));
             return updated;
         });
+
+        // Persist to Supabase
+        const { error } = await supabase.auth.updateUser({
+            data: {
+                settings: {
+                    ...appSettings,
+                    ...newSettings
+                }
+            }
+        });
+
+        if (error) console.error('Error saving settings to DB:', error);
+    };
+
+    const addCustomer = async (customer: Omit<Customer, 'id' | 'value' | 'lastContact'>) => {
+        // Prepare DB object (map camelCase to snake_case if needed, assuming DB cols are standard)
+        // If DB has 'created_at' it handles lastContact logic often, but we'll insert what we can.
+        // We'll init value to 0 and lastContact to now.
+        const dbCustomer = {
+            ...customer,
+            // value: 0, // DB likely has default
+            last_contact_at: new Date().toISOString(),
+        };
+
+        const { data, error } = await supabase
+            .from('customers')
+            .insert([dbCustomer])
+            .select()
+            .single();
+
+        if (error) {
+            console.error('Error adding customer:', error);
+            alert('Failed to add customer: ' + error.message);
+        } else if (data) {
+            const newCustomer: Customer = {
+                id: data.id,
+                name: data.name,
+                email: data.email,
+                status: data.status,
+                company: data.company,
+                value: '$0', // default
+                lastContact: new Date(data.last_contact_at).toLocaleDateString()
+            };
+            setCustomers(prev => [newCustomer, ...prev]);
+            logActivity('customer', `Added new customer ${newCustomer.name}`);
+        }
+    };
+
+    const updateCustomer = async (id: number, data: Partial<Customer>) => {
+        const { error } = await supabase
+            .from('customers')
+            .update(data)
+            .eq('id', id);
+
+        if (!error) {
+            setCustomers(prev => prev.map(c => c.id === id ? { ...c, ...data } : c));
+        } else {
+            console.error('Error updating customer:', error);
+            alert('Error updating customer');
+        }
+    };
+
+    const updateCustomerStatus = async (id: number, status: Customer['status']) => {
+        // Optimistic update
+        setCustomers(prev => prev.map(c => c.id === id ? { ...c, status } : c));
+
+        const { error } = await supabase
+            .from('customers')
+            .update({ status })
+            .eq('id', id);
+
+        if (error) {
+            console.error('Error updating customer status:', error);
+            // Revert? For now, we assume success or user sees an error eventually but optimistic makes UI snappy
+            alert('Failed to update status on server');
+        } else {
+            logActivity('customer', `Updated customer status to ${status}`);
+        }
     };
 
     const logActivity = (type: 'deal' | 'task' | 'customer' | 'lead', title: string) => {
@@ -156,70 +333,7 @@ export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children 
         setRecentActivities(prev => [newActivity, ...prev].slice(0, 10));
     };
 
-    // Initial Data Fetch
-    useEffect(() => {
-        const fetchData = async () => {
-            console.log('Fetching initial dashboard data...');
-
-            // Fetch Deals
-            const { data: dealsData, error: dealsError } = await supabase
-                .from('deals')
-                .select('*')
-                .order('id', { ascending: false });
-
-            if (dealsError) {
-                console.error('Error fetching deals:', dealsError);
-            } else if (dealsData) {
-                console.log('Deals fetched:', dealsData.length);
-                setDeals(dealsData.map((d: any) => ({
-                    ...d,
-                    customerId: d.customer_id,
-                    // status is already correct
-                })));
-            }
-
-            // Fetch Tasks
-            const { data: tasksData, error: tasksError } = await supabase
-                .from('tasks')
-                .select('*')
-                .order('id', { ascending: false });
-
-            if (tasksError) {
-                console.error('Error fetching tasks:', tasksError);
-            } else if (tasksData) {
-                console.log('Tasks fetched:', tasksData.length);
-                setTasks(tasksData.map((t: any) => ({
-                    ...t,
-                    dealId: t.deal_id,
-                    dueDate: t.due_date,
-                })));
-            }
-
-            // Fetch Customers
-            const { data: customersData, error: customersError } = await supabase
-                .from('customers')
-                .select('*')
-                .order('id', { ascending: false });
-
-            if (customersError) {
-                console.error('Error fetching customers:', customersError);
-            } else if (customersData) {
-                console.log('Customers fetched:', customersData.length);
-                const formattedCustomers: Customer[] = customersData.map((c: any) => ({
-                    id: c.id,
-                    name: c.name,
-                    email: c.email || '',
-                    status: c.status,
-                    company: c.company || '',
-                    value: '$0', // DB doesn't have value for customer, maybe derive from deals?
-                    lastContact: c.last_contact_at ? new Date(c.last_contact_at).toLocaleDateString() : 'Never',
-                }));
-                setCustomers(formattedCustomers);
-            }
-        };
-
-        fetchData();
-    }, []);
+    // Derived state calculators with Comparison Logic
 
     // Derived state calculators with Comparison Logic
     const currentMonth = new Date().getMonth();
@@ -310,6 +424,21 @@ export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children 
         }
     };
 
+    const updateDeal = async (id: number, data: Partial<Deal>) => {
+        const { error } = await supabase
+            .from('deals')
+            .update(data)
+            .eq('id', id);
+
+        if (!error) {
+            setDeals(prev => prev.map(d => d.id === id ? { ...d, ...data } : d));
+            logActivity('deal', `Updated deal details`);
+        } else {
+            console.error('Error updating deal:', error);
+            alert('Failed to update deal');
+        }
+    };
+
     const updateDealStatus = async (id: number, status: 'Active' | 'Won' | 'Lost') => {
         const { error } = await supabase
             .from('deals')
@@ -366,6 +495,24 @@ export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children 
             alert('Failed to add task: ' + error.message);
         } else if (data) {
             setTasks(prev => [{ ...data, dealId: data.deal_id, dueDate: data.due_date }, ...prev]);
+        }
+    };
+
+    const updateTask = async (id: number, data: Partial<Task>) => {
+        // Map fields to DB columns
+        const dbData: any = { ...data };
+        if (data.dealId) dbData.deal_id = data.dealId;
+        if (data.dueDate) dbData.due_date = data.dueDate;
+
+        const { error } = await supabase
+            .from('tasks')
+            .update(dbData)
+            .eq('id', id);
+
+        if (!error) {
+            setTasks(prev => prev.map(t => t.id === id ? { ...t, ...data } : t));
+        } else {
+            console.error('Error updating task:', error);
         }
     };
 
@@ -444,7 +591,12 @@ export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children 
             addDeal,
             updateDealStatus,
             addLead,
+            addCustomer,
+            updateCustomerStatus,
+            updateCustomer, // New
+            updateDeal, // New
             addTask,
+            updateTask, // New
             toggleTask,
             resetDashboard,
             deleteCustomer,

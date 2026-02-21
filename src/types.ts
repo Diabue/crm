@@ -3,7 +3,7 @@ export interface Customer {
     id: number;
     name: string;
     email: string;
-    status: 'Lead' | 'Potential' | 'Customer' | 'Cold';
+    status: 'Lead' | 'Potential' | 'Customer' | 'Cold' | 'Refused';
     company?: string;
     value: string;
     lastContact: string;
@@ -19,7 +19,7 @@ export interface Email {
     date: string;
     read: boolean;
     aiSummary: string;
-    suggestedStatus: 'Potential' | 'Cold' | 'Customer';
+    suggestedStatus: 'Potential' | 'Cold' | 'Customer' | 'Won' | 'Lost';
     customerId?: number;
     direction: 'Inbound' | 'Outbound'; // Added to match usage in Mails.tsx
 }
@@ -30,6 +30,14 @@ export interface SentEmail {
     recipient: string;
     date: string;
     status: 'Sent' | 'Opened' | 'Clicked';
+    // Fields for viewing
+    from: string;
+    company: string;
+    fullText: string;
+    excerpt: string;
+    aiSummary: string;
+    suggestedStatus: 'Potential' | 'Cold' | 'Customer' | 'Won' | 'Lost';
+    direction: 'Outbound';
 }
 
 export interface Deal {

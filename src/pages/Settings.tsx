@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Trash2, AlertTriangle, CheckCircle, User, Palette, Globe, Key, Bell, CheckSquare } from 'lucide-react';
+import { Trash2, AlertTriangle, CheckCircle, User, Palette, Globe, Key, Bell } from 'lucide-react';
 import { useDashboard } from '../context/DashboardContext';
 
 const Settings: React.FC = () => {
@@ -40,6 +40,8 @@ const Settings: React.FC = () => {
                         <label className="text-sm text-text-secondary mb-1 block">Full Name</label>
                         <input
                             type="text"
+                            name="fullName"
+                            autoComplete="off"
                             value={userProfile.name}
                             onChange={(e) => updateUserProfile({ name: e.target.value })}
                             className="w-full bg-background border border-border rounded-xl px-4 py-2 text-white focus:border-primary/50 outline-none"
@@ -49,6 +51,8 @@ const Settings: React.FC = () => {
                         <label className="text-sm text-text-secondary mb-1 block">Role</label>
                         <input
                             type="text"
+                            name="role"
+                            autoComplete="off"
                             value={userProfile.role}
                             onChange={(e) => updateUserProfile({ role: e.target.value })}
                             className="w-full bg-background border border-border rounded-xl px-4 py-2 text-white focus:border-primary/50 outline-none"
@@ -58,6 +62,8 @@ const Settings: React.FC = () => {
                         <label className="text-sm text-text-secondary mb-1 block">Avatar URL (Optional)</label>
                         <input
                             type="text"
+                            name="avatar"
+                            autoComplete="off"
                             value={userProfile.avatar}
                             placeholder="https://..."
                             onChange={(e) => updateUserProfile({ avatar: e.target.value })}
@@ -123,13 +129,15 @@ const Settings: React.FC = () => {
                 </h2>
 
                 <div>
-                    <label className="text-sm text-text-secondary mb-1 block">OpenAI API Key</label>
+                    <label className="text-sm text-text-secondary mb-1 block">Gemini API Key</label>
                     <div className="relative">
                         <input
                             type="password"
+                            name="apiKey"
+                            autoComplete="new-password"
                             value={appSettings.aiApiKey || ''}
                             onChange={(e) => updateAppSettings({ aiApiKey: e.target.value })}
-                            placeholder="sk-..."
+                            placeholder="AIzaSy..."
                             className="w-full bg-background border border-border rounded-xl px-4 py-2 text-white focus:border-primary/50 outline-none pr-10"
                         />
                         <div className="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary">

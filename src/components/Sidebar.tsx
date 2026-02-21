@@ -1,7 +1,6 @@
 import React from 'react';
 import {
     LayoutDashboard,
-    BarChart2,
     Users,
     Briefcase,
     CheckSquare,
@@ -12,6 +11,8 @@ import {
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { SidebarProps } from '../types';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
 
 interface NavItem {
     name: string;
@@ -22,10 +23,20 @@ import { useDashboard } from '../context/DashboardContext';
 
 const Sidebar: React.FC<SidebarProps> = ({ active, setActive }) => {
     const { userProfile } = useDashboard();
+    const navigate = useNavigate();
+
+    const handleLogout = async () => {
+        const { error } = await supabase.auth.signOut();
+        if (error) {
+            console.error('Error logging out:', error);
+            alert('Error logging out');
+        } else {
+            navigate('/login');
+        }
+    };
     const navItems: NavItem[] = [
         { name: 'Home', icon: LayoutDashboard },
         { name: 'Mails', icon: Mail },
-        { name: 'Analytics', icon: BarChart2 },
         { name: 'Customers', icon: Users },
         { name: 'Deals', icon: Briefcase },
         { name: 'Tasks', icon: CheckSquare },
@@ -69,7 +80,11 @@ const Sidebar: React.FC<SidebarProps> = ({ active, setActive }) => {
 
             {/* User Profile */}
             <div className="p-4 border-t border-border">
-                <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-surface-highlight cursor-pointer transition-colors">
+                <div
+                    onClick={handleLogout}
+                    className="flex items-center gap-3 p-3 rounded-xl hover:bg-surface-highlight cursor-pointer transition-colors"
+                    title="Click to Logout"
+                >
                     <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-primary to-accent overflow-hidden border-2 border-surface flex items-center justify-center relative">
                         {userProfile.avatar ? (
                             <img src={userProfile.avatar} alt="Avatar" className="w-full h-full object-cover" />

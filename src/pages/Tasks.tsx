@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { CheckSquare, Plus, Calendar, CheckCircle2, Circle, Trash2, Link } from 'lucide-react';
+import { CheckSquare, Plus, Calendar as CalendarIcon, CheckCircle2, Circle, Trash2, Link, Edit2, X, LayoutList } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { useDashboard } from '../context/DashboardContext';
 import { Task } from '../types';
+import CalendarView from '../components/CalendarView';
 
 const Tasks: React.FC = () => {
-    const { tasks, addTask, toggleTask, deleteTask, deals } = useDashboard();
+    const { tasks, addTask, updateTask, toggleTask, deleteTask, deals } = useDashboard();
     const [showModal, setShowModal] = useState(false);
     const location = useLocation();
+    const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
+    const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
 
     // Auto-open modal if query param exists
     useEffect(() => {
@@ -23,35 +26,75 @@ const Tasks: React.FC = () => {
     const [tag, setTag] = useState('General');
     const [selectedDealId, setSelectedDealId] = useState<string>('');
 
-    const handleAddTask = () => {
+    const handleSaveTask = () => {
         if (!title) {
             alert('Please enter a task title');
             return;
         }
 
-        const newTask: Task = {
-            id: Date.now(),
-            title,
-            dueDate: dueDate ? new Date(dueDate).toISOString() : new Date().toISOString(),
-            tag,
-            completed: false,
-            dealId: selectedDealId ? parseInt(selectedDealId) : undefined
-        };
+        if (editingTaskId) {
+            updateTask(editingTaskId, {
+                title,
+                dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
+                tag,
+                dealId: selectedDealId ? parseInt(selectedDealId) : undefined
+            });
+        } else {
+            const newTask: Task = {
+                id: Date.now(),
+                title,
+                dueDate: dueDate ? new Date(dueDate).toISOString() : new Date().toISOString(),
+                tag,
+                completed: false,
+                dealId: selectedDealId ? parseInt(selectedDealId) : undefined
+            };
+            addTask(newTask);
+        }
 
-        addTask(newTask);
+        resetModal();
+    };
 
-        // Reset form
+    const openEditModal = (task: Task) => {
+        setTitle(task.title);
+        setDueDate(task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : '');
+        setTag(task.tag || 'General');
+        setSelectedDealId(task.dealId ? task.dealId.toString() : '');
+        setEditingTaskId(task.id);
+        setShowModal(true);
+    };
+
+    const resetModal = () => {
         setTitle('');
         setDueDate('');
         setTag('General');
         setSelectedDealId('');
+        setEditingTaskId(null);
         setShowModal(false);
     };
 
     return (
         <div className="space-y-6 h-full flex flex-col relative">
             <div className="flex justify-between items-center">
-                <h1 className="text-2xl font-bold text-white">Tasks & Reminders</h1>
+                <div className="flex items-center gap-4">
+                    <h1 className="text-2xl font-bold text-white">Tasks & Reminders</h1>
+                    <div className="bg-surface border border-border rounded-lg p-1 flex">
+                        <button
+                            onClick={() => setViewMode('list')}
+                            className={`p-1.5 rounded-md transition-colors ${viewMode === 'list' ? 'bg-primary text-white' : 'text-text-secondary hover:text-white'}`}
+                            title="List View"
+                        >
+                            <LayoutList size={18} />
+                        </button>
+                        <button
+                            onClick={() => setViewMode('calendar')}
+                            className={`p-1.5 rounded-md transition-colors ${viewMode === 'calendar' ? 'bg-primary text-white' : 'text-text-secondary hover:text-white'}`}
+                            title="Calendar View"
+                        >
+                            <CalendarIcon size={18} />
+                        </button>
+                    </div>
+                </div>
+
                 <button
                     onClick={() => setShowModal(true)}
                     className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-5 py-2.5 rounded-xl font-medium shadow-lg shadow-primary/25 transition-all active:scale-95"
@@ -61,7 +104,15 @@ const Tasks: React.FC = () => {
                 </button>
             </div>
 
-            {tasks.length === 0 ? (
+            {viewMode === 'calendar' ? (
+                <div className="flex-1 overflow-hidden">
+                    <CalendarView
+                        tasks={tasks}
+                        onEditTask={openEditModal}
+                        onToggleTask={toggleTask}
+                    />
+                </div>
+            ) : tasks.length === 0 ? (
                 <div className="flex items-center justify-center flex-1 glass-card border-dashed">
                     <div className="text-center text-text-secondary">
                         <CheckSquare size={48} className="mx-auto mb-4 opacity-50" />
@@ -83,6 +134,13 @@ const Tasks: React.FC = () => {
                                         {task.tag}
                                     </span>
                                     <div className="flex gap-2">
+                                        <button
+                                            onClick={() => openEditModal(task)}
+                                            className="text-text-secondary hover:text-primary transition-colors opacity-0 group-hover:opacity-100"
+                                            title="Edit Task"
+                                        >
+                                            <Edit2 size={18} />
+                                        </button>
                                         <button
                                             onClick={() => deleteTask(task.id)}
                                             className="text-text-secondary hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
@@ -111,7 +169,7 @@ const Tasks: React.FC = () => {
                                 )}
 
                                 <div className="flex items-center gap-2 text-xs text-text-secondary mt-auto">
-                                    <Calendar size={12} />
+                                    <CalendarIcon size={12} />
                                     <span>{task.dueDate}</span>
                                 </div>
                             </div>
@@ -124,7 +182,12 @@ const Tasks: React.FC = () => {
             {showModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                     <div className="bg-surface border border-border rounded-2xl w-full max-w-sm p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
-                        <h2 className="text-xl font-bold text-white mb-4">Create New Task</h2>
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="text-xl font-bold text-white">{editingTaskId ? 'Edit Task' : 'Add New Task'}</h2>
+                            <button onClick={resetModal} className="text-text-secondary hover:text-white">
+                                <X size={20} />
+                            </button>
+                        </div>
 
                         <div className="space-y-4">
                             <div>
@@ -183,16 +246,16 @@ const Tasks: React.FC = () => {
 
                         <div className="flex gap-3 mt-6">
                             <button
-                                onClick={() => setShowModal(false)}
+                                onClick={resetModal}
                                 className="flex-1 py-2.5 rounded-xl text-text-secondary hover:text-white hover:bg-surface-highlight transition-colors font-medium"
                             >
                                 Cancel
                             </button>
                             <button
-                                onClick={handleAddTask}
+                                onClick={handleSaveTask}
                                 className="flex-1 bg-primary hover:bg-primary/90 text-white py-2.5 rounded-xl font-medium shadow-lg shadow-primary/25 transition-all"
                             >
-                                Create Task
+                                {editingTaskId ? 'Update Task' : 'Create Task'}
                             </button>
                         </div>
                     </div>

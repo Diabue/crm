@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import DashboardHome from './pages/DashboardHome';
 import Customers from './pages/Customers';
+import CustomerDetails from './pages/CustomerDetails';
 import Mails from './pages/Mails';
 import Deals from './pages/Deals';
 import Tasks from './pages/Tasks';
@@ -27,7 +28,6 @@ const DashboardLayout: React.FC = () => {
         if (pathname.includes('/mails')) return 'Mails';
         if (pathname.includes('/deals')) return 'Deals';
         if (pathname.includes('/tasks')) return 'Tasks';
-        if (pathname.includes('/analytics')) return 'Analytics';
         if (pathname.includes('/settings')) return 'Settings';
         return 'Home';
     };
@@ -42,7 +42,6 @@ const DashboardLayout: React.FC = () => {
             case 'Customers': navigate('/customers'); break;
             case 'Deals': navigate('/deals'); break;
             case 'Tasks': navigate('/tasks'); break;
-            case 'Analytics': navigate('/analytics'); break;
             case 'Settings': navigate('/settings'); break;
             default: navigate('/');
         }
@@ -94,6 +93,7 @@ const DashboardLayout: React.FC = () => {
                             <Route path="/" element={<DashboardHome />} />
                             <Route path="/mails" element={<Mails />} />
                             <Route path="/customers" element={<Customers />} />
+                            <Route path="/customers/:id" element={<CustomerDetails />} />
                             <Route path="/deals" element={<Deals />} />
                             <Route path="/tasks" element={<Tasks />} />
                             <Route path="/settings" element={<Settings />} />
