@@ -118,7 +118,7 @@ const AIProspecting: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const handleTriggerResearch = async () => {
         try {
-            const res = await fetch('https://crm-backend-production-b02c.up.railway.app/api/agent/trigger-research', {
+            const res = await fetch('https://crm-backend-production-7533.up.railway.app/api/agent/trigger-research', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ query: searchQuery })
@@ -135,7 +135,7 @@ const AIProspecting: React.FC = () => {
     // Outreach Trigger
     const handleTriggerOutreach = async () => {
         try {
-            const res = await fetch('https://crm-backend-production-b02c.up.railway.app/api/agent/trigger-outreach', {
+            const res = await fetch('https://crm-backend-production-7533.up.railway.app/api/agent/trigger-outreach', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' }
             });
