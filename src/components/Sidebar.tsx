@@ -7,7 +7,8 @@ import {
     Settings,
     LogOut,
     Mail,
-    LucideIcon
+    LucideIcon,
+    Bot
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { SidebarProps } from '../types';
@@ -36,6 +37,7 @@ const Sidebar: React.FC<SidebarProps> = ({ active, setActive }) => {
     };
     const navItems: NavItem[] = [
         { name: 'Home', icon: LayoutDashboard },
+        { name: 'AI Prospects', icon: Bot },
         { name: 'Mails', icon: Mail },
         { name: 'Customers', icon: Users },
         { name: 'Deals', icon: Briefcase },

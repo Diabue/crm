@@ -10,6 +10,7 @@ import Deals from './pages/Deals';
 import Tasks from './pages/Tasks';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
+import AIProspecting from './pages/AIProspecting';
 import { supabase } from './lib/supabase';
 import { Session } from '@supabase/supabase-js';
 import { Loader2 } from 'lucide-react';
@@ -26,6 +27,7 @@ const DashboardLayout: React.FC = () => {
         if (pathname === '/' || pathname === '') return 'Home';
         if (pathname.includes('/customers')) return 'Customers';
         if (pathname.includes('/mails')) return 'Mails';
+        if (pathname.includes('/prospects')) return 'AI Prospects';
         if (pathname.includes('/deals')) return 'Deals';
         if (pathname.includes('/tasks')) return 'Tasks';
         if (pathname.includes('/settings')) return 'Settings';
@@ -39,6 +41,7 @@ const DashboardLayout: React.FC = () => {
         switch (tabName) {
             case 'Home': navigate('/'); break;
             case 'Mails': navigate('/mails'); break;
+            case 'AI Prospects': navigate('/prospects'); break;
             case 'Customers': navigate('/customers'); break;
             case 'Deals': navigate('/deals'); break;
             case 'Tasks': navigate('/tasks'); break;
@@ -92,6 +95,7 @@ const DashboardLayout: React.FC = () => {
                         <Routes>
                             <Route path="/" element={<DashboardHome />} />
                             <Route path="/mails" element={<Mails />} />
+                            <Route path="/prospects" element={<AIProspecting />} />
                             <Route path="/customers" element={<Customers />} />
                             <Route path="/customers/:id" element={<CustomerDetails />} />
                             <Route path="/deals" element={<Deals />} />
