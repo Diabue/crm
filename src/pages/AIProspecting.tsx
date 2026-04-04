@@ -58,13 +58,13 @@ const AIProspecting: React.FC = () => {
     // Initial Fetch & Realtime Subscriptions
     useEffect(() => {
         const fetchInitialData = async () => {
-            // Logs
+            // Pobierz ostatnie 100 logów (najnowsze)
             const { data: logData } = await supabase
                 .from('agent_logs')
                 .select('*')
-                .order('created_at', { ascending: true })
+                .order('created_at', { ascending: false })
                 .limit(100);
-            if (logData) setLogs(logData);
+            if (logData) setLogs(logData.reverse());
 
             // Leads
             const { data: leadData } = await supabase
