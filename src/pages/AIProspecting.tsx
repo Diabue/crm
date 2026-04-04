@@ -197,7 +197,7 @@ const AIProspecting: React.FC = () => {
                                             {agentStatus.Research ? 'ON' : 'OFF'}
                                         </button>
                                     </div>
-                                    <div className="text-xs text-text-secondary">CRON: {agentStatus.Research ? 'Aktywny (co 12h)' : 'UŚPIONY PRZEZ SZEFA'}</div>
+                                    <div className="text-xs text-text-secondary">CRON: {agentStatus.Research ? 'Aktywny (co 6h)' : 'UŚPIONY PRZEZ SZEFA'}</div>
                                 </div>
                                 <div className={`p-4 border rounded-xl transition-all ${agentStatus.Outreach ? 'bg-background border-border' : 'bg-red-500/10 border-red-500/30'}`}>
                                     <div className="flex justify-between items-center mb-2">
@@ -226,7 +226,7 @@ const AIProspecting: React.FC = () => {
                             <h2 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
                                 Kontrola Agenta Poszukującego
                             </h2>
-                            <p className="text-sm text-text-secondary mb-6">Agent automatycznie działa co 12 godzin. Możesz tutaj wymusić jednorazowe, niespodziewane szukanie w Google Places.</p>
+                            <p className="text-sm text-text-secondary mb-6">Agent automatycznie działa co 6 godzin. Możesz tutaj wymusić jednorazowe, niespodziewane szukanie w Google Places.</p>
                             
                             <div className="space-y-4">
                                 <div>
