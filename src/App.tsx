@@ -54,14 +54,14 @@ const DashboardLayout: React.FC = () => {
         <div className="bg-background h-screen w-screen font-sans text-text-main selection:bg-primary/30 flex overflow-hidden">
             {/* Mobile Hamburger Button */}
             <button
-                className="md:hidden fixed top-4 left-4 z-50 p-2 bg-surface border border-border rounded-lg text-white"
+                className="md:hidden fixed top-4 left-4 z-50 p-2 bg-surface border border-border rounded-lg text-white shadow-lg"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             >
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="3" y1="12" x2="21" y2="12"></line>
-                    <line x1="3" y1="6" x2="21" y2="6"></line>
-                    <line x1="3" y1="18" x2="21" y2="18"></line>
-                </svg>
+                {mobileMenuOpen ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                )}
             </button>
 
             {/* Sidebar Wrapper */}
@@ -75,7 +75,7 @@ const DashboardLayout: React.FC = () => {
             {/* Overlay for mobile */}
             {mobileMenuOpen && (
                 <div
-                    className="fixed inset-0 bg-black/50 z-30 md:hidden"
+                    className="fixed inset-0 bg-black/60 z-30 md:hidden"
                     onClick={() => setMobileMenuOpen(false)}
                 />
             )}
@@ -86,12 +86,12 @@ const DashboardLayout: React.FC = () => {
                     <div className="md:block hidden">
                         <Header />
                     </div>
-                    {/* Mobile Header Spacer */}
-                    <div className="md:hidden h-16 flex items-center justify-center border-b border-border bg-surface mb-4">
-                        <span className="text-lg font-bold text-white">Dashboard</span>
+                    {/* Mobile Header */}
+                    <div className="md:hidden h-14 flex items-center justify-center border-b border-border bg-surface/80 backdrop-blur-sm sticky top-0 z-20">
+                        <span className="text-base font-bold text-white">{activeTab}</span>
                     </div>
 
-                    <div className="p-4 md:p-8 space-y-8 max-w-[1600px] mx-auto w-full pb-20 min-h-[calc(100vh-80px)]">
+                    <div className="p-3 md:p-8 space-y-4 md:space-y-8 max-w-[1600px] mx-auto w-full pb-24 md:pb-10 min-h-[calc(100vh-80px)]">
                         <Routes>
                             <Route path="/" element={<DashboardHome />} />
                             <Route path="/mails" element={<Mails />} />
@@ -105,6 +105,31 @@ const DashboardLayout: React.FC = () => {
                         </Routes>
                     </div>
                 </div>
+
+                {/* Mobile Bottom Nav Bar */}
+                <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-surface/95 backdrop-blur-md border-t border-border flex justify-around items-center h-16 px-2">
+                    {[
+                        { name: 'Home', path: '/', icon: '🏠' },
+                        { name: 'AI', path: '/prospects', icon: '🤖' },
+                        { name: 'Mails', path: '/mails', icon: '✉️' },
+                        { name: 'Customers', path: '/customers', icon: '👥' },
+                        { name: 'Deals', path: '/deals', icon: '💼' },
+                    ].map(item => (
+                        <button
+                            key={item.name}
+                            onClick={() => handleNavigation(item.name === 'Home' ? 'Home' : item.name === 'AI' ? 'AI Prospects' : item.name)}
+                            className={`flex flex-col items-center gap-0.5 px-2 py-1 rounded-xl transition-all ${
+                                (item.name === 'Home' && activeTab === 'Home') ||
+                                (item.name === 'AI' && activeTab === 'AI Prospects') ||
+                                activeTab === item.name
+                                    ? 'text-primary' : 'text-text-secondary'
+                            }`}
+                        >
+                            <span className="text-lg">{item.icon}</span>
+                            <span className="text-[10px] font-medium">{item.name}</span>
+                        </button>
+                    ))}
+                </nav>
             </main>
         </div>
     );

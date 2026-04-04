@@ -36,9 +36,9 @@ const DashboardHome: React.FC = () => {
     // If empty, maybe show empty state.
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-4 md:space-y-6">
             {/* Stats Row */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
                 <StatCard
                     title="Total Revenue"
                     value={`$${revenue.toLocaleString()}`}
@@ -69,9 +69,9 @@ const DashboardHome: React.FC = () => {
                 />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
                 {/* Main Chart */}
-                <div className="lg:col-span-2 min-h-[400px]">
+                <div className="lg:col-span-2 min-h-[280px] md:min-h-[400px]">
                     <RevenueChart />
                 </div>
 
@@ -104,7 +104,7 @@ const DashboardHome: React.FC = () => {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
                 {/* Top Customers */}
                 <div className="lg:col-span-2 glass-card p-6">
                     <h3 className="text-lg font-semibold text-white mb-6 flex items-center justify-between">

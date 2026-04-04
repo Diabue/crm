@@ -78,47 +78,47 @@ const Customers: React.FC = () => {
         : customers.filter(c => c.status === activeTab);
 
     return (
-        <div className="space-y-6 h-full flex flex-col">
+        <div className="space-y-4 md:space-y-6 h-full flex flex-col">
             {/* Header Actions */}
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
                 <div>
-                    <h1 className="text-2xl font-bold text-white">Customers & Leads</h1>
-                    <p className="text-text-secondary">Manage your relationships and email campaigns</p>
+                    <h1 className="text-xl md:text-2xl font-bold text-white">Customers & Leads</h1>
+                    <p className="text-text-secondary text-sm">Manage your relationships and email campaigns</p>
                 </div>
-                <div className="flex gap-3">
+                <div className="flex gap-2">
                     <button
                         onClick={() => setShowAddCustomerModal(true)}
-                        className="flex items-center gap-2 bg-surface border border-border hover:bg-surface-highlight text-white px-5 py-2.5 rounded-xl font-medium transition-all active:scale-95"
+                        className="flex items-center gap-2 bg-surface border border-border hover:bg-surface-highlight text-white px-3 md:px-5 py-2 md:py-2.5 rounded-xl font-medium transition-all active:scale-95 text-sm"
                     >
-                        <Plus size={18} />
-                        <span>Add Customer</span>
+                        <Plus size={16} />
+                        <span>Add</span>
                     </button>
                     <button
                         onClick={() => setShowCampaignModal(true)}
-                        className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-5 py-2.5 rounded-xl font-medium shadow-lg shadow-primary/25 transition-all active:scale-95"
+                        className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-3 md:px-5 py-2 md:py-2.5 rounded-xl font-medium shadow-lg shadow-primary/25 transition-all active:scale-95 text-sm"
                     >
-                        <Mail size={18} />
-                        <span>New Campaign</span>
+                        <Mail size={16} />
+                        <span>Campaign</span>
                     </button>
                 </div>
             </div>
 
             {/* Filters & Search */}
-            <div className="flex gap-4">
-                <div className="relative flex-1 max-w-md">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" size={18} />
+            <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" size={16} />
                     <input
                         type="text"
                         placeholder="Search customers..."
-                        className="w-full bg-surface border border-border rounded-xl py-2.5 pl-10 pr-4 text-sm text-white focus:outline-none focus:border-primary/50 transition-all"
+                        className="w-full bg-surface border border-border rounded-xl py-2.5 pl-9 pr-4 text-sm text-white focus:outline-none focus:border-primary/50 transition-all"
                     />
                 </div>
-                <div className="flex bg-surface border border-border rounded-xl p-1">
+                <div className="flex bg-surface border border-border rounded-xl p-1 overflow-x-auto gap-1 flex-shrink-0">
                     {(['All', 'Customer', 'Potential', 'Cold'] as const).map(tab => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
-                            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${activeTab === tab ? 'bg-background text-white shadow-sm' : 'text-text-secondary hover:text-white'
+                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${activeTab === tab ? 'bg-background text-white shadow-sm' : 'text-text-secondary hover:text-white'
                                 }`}
                         >
                             {tab}
@@ -127,9 +127,10 @@ const Customers: React.FC = () => {
                 </div>
             </div>
 
-            {/* Customers Table */}
+            {/* Desktop: Table / Mobile: Cards */}
             <div className="glass-card flex-1 overflow-hidden flex flex-col">
-                <div className="overflow-auto flex-1">
+                {/* Desktop Table */}
+                <div className="hidden md:block overflow-auto flex-1">
                     <table className="w-full text-left border-collapse">
                         <thead className="sticky top-0 bg-surface/95 backdrop-blur-sm z-10">
                             <tr className="text-xs text-text-secondary border-b border-border">
@@ -157,7 +158,6 @@ const Customers: React.FC = () => {
                                             value={customer.status}
                                             onChange={(e) => updateCustomerStatus(customer.id, e.target.value as CustomerStatus)}
                                             className={`px-2 py-1 rounded-md text-xs font-medium border bg-transparent cursor-pointer outline-none focus:ring-1 focus:ring-white/20 transition-colors appearance-none text-center ${statusColors[customer.status]}`}
-                                            title="Change Status"
                                         >
                                             <option value="Lead" className="bg-surface text-gray-300">Lead</option>
                                             <option value="Potential" className="bg-surface text-blue-400">Potential</option>
@@ -170,26 +170,50 @@ const Customers: React.FC = () => {
                                     <td className="py-3 text-text-secondary">{customer.lastContact}</td>
                                     <td className="py-3 pr-6 text-right">
                                         <div className="flex justify-end gap-2">
-                                            <button
-                                                onClick={() => openEditModal(customer)}
-                                                className="text-text-secondary hover:text-primary p-1 rounded-lg hover:bg-surface-highlight transition-colors"
-                                                title="Edit Customer"
-                                            >
-                                                <Edit2 size={18} />
-                                            </button>
-                                            <button
-                                                onClick={() => handleDelete(customer.id)}
-                                                className="text-text-secondary hover:text-red-400 p-1 rounded-lg hover:bg-surface-highlight transition-colors"
-                                                title="Delete Customer"
-                                            >
-                                                <Trash2 size={18} />
-                                            </button>
+                                            <button onClick={() => openEditModal(customer)} className="text-text-secondary hover:text-primary p-1 rounded-lg hover:bg-surface-highlight transition-colors"><Edit2 size={16} /></button>
+                                            <button onClick={() => handleDelete(customer.id)} className="text-text-secondary hover:text-red-400 p-1 rounded-lg hover:bg-surface-highlight transition-colors"><Trash2 size={16} /></button>
                                         </div>
                                     </td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
+                </div>
+
+                {/* Mobile Cards */}
+                <div className="md:hidden overflow-y-auto flex-1 p-3 space-y-2">
+                    {filteredCustomers.map((customer) => (
+                        <div key={customer.id} className="bg-background rounded-xl p-4 border border-border/50">
+                            <div className="flex items-start justify-between mb-2">
+                                <div
+                                    onClick={() => window.location.href = `/customers/${customer.id}`}
+                                    className="font-semibold text-white cursor-pointer hover:text-primary transition-colors"
+                                >
+                                    {customer.name}
+                                </div>
+                                <select
+                                    value={customer.status}
+                                    onChange={(e) => updateCustomerStatus(customer.id, e.target.value as CustomerStatus)}
+                                    className={`px-2 py-0.5 rounded-md text-xs font-medium border bg-transparent cursor-pointer outline-none appearance-none ${statusColors[customer.status]}`}
+                                >
+                                    <option value="Lead" className="bg-surface">Lead</option>
+                                    <option value="Potential" className="bg-surface">Potential</option>
+                                    <option value="Customer" className="bg-surface">Customer</option>
+                                    <option value="Cold" className="bg-surface">Cold</option>
+                                    <option value="Refused" className="bg-surface">Refused</option>
+                                </select>
+                            </div>
+                            <div className="text-xs text-text-secondary mb-1">{customer.email}</div>
+                            {customer.company && <div className="text-xs text-text-secondary">{customer.company}</div>}
+                            <div className="flex justify-end gap-2 mt-3">
+                                <button onClick={() => openEditModal(customer)} className="text-text-secondary hover:text-primary p-1.5 rounded-lg bg-surface hover:bg-surface-highlight transition-colors"><Edit2 size={14} /></button>
+                                <button onClick={() => handleDelete(customer.id)} className="text-text-secondary hover:text-red-400 p-1.5 rounded-lg bg-surface hover:bg-surface-highlight transition-colors"><Trash2 size={14} /></button>
+                            </div>
+                        </div>
+                    ))}
+                    {filteredCustomers.length === 0 && (
+                        <div className="text-center text-text-secondary py-12 text-sm">No customers found.</div>
+                    )}
                 </div>
             </div>
 
