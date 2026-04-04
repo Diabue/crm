@@ -116,15 +116,18 @@ const AIProspecting: React.FC = () => {
 
     // Research Trigger
     const [searchQuery, setSearchQuery] = useState('');
+    const [waOnly, setWaOnly] = useState(false);
     const handleTriggerResearch = async () => {
         try {
             const res = await fetch('https://crm-backend-production-7533.up.railway.app/api/agent/trigger-research', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ query: searchQuery })
+                body: JSON.stringify({ query: searchQuery, waOnly })
             });
-            if (res.ok) alert(`Obudziłem Research Agenta! Szuka właśnie: "${searchQuery || 'Firma'}". Zerknij w prawo do logów.`);
-            else alert("Nie udało się wypuścić agenta. Czy backend żyje?");
+            if (res.ok) {
+                const data = await res.json();
+                alert(data.message || `Obudziłem Research Agenta!`);
+            } else alert("Nie udało się wypuścić agenta. Czy backend żyje?");
             setSearchQuery('');
         } catch (e) {
             console.error(e);
@@ -239,6 +242,33 @@ const AIProspecting: React.FC = () => {
                                         onChange={(e) => setSearchQuery(e.target.value)}
                                     />
                                 </div>
+
+                                {/* Toggle trybu WA Only */}
+                                <div
+                                    onClick={() => setWaOnly(!waOnly)}
+                                    className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all select-none ${
+                                        waOnly 
+                                            ? 'bg-green-500/10 border-green-500/40 text-green-400' 
+                                            : 'bg-background border-border text-text-secondary'
+                                    }`}
+                                >
+                                    <div>
+                                        <p className="font-medium text-sm">{waOnly ? '📱 Tylko WhatsApp' : '📧 Email + WhatsApp'}</p>
+                                        <p className="text-xs opacity-70">
+                                            {waOnly 
+                                                ? 'Szuka TYLKO firm bez strony WWW (kontakt przez WA)'
+                                                : 'Szuka wszystkich firm (email i WA)'}
+                                        </p>
+                                    </div>
+                                    <div className={`w-10 h-5 rounded-full relative transition-colors ${
+                                        waOnly ? 'bg-green-500' : 'bg-surface-hover'
+                                    }`}>
+                                        <div className={`absolute top-0.5 left-0.5 bg-white w-4 h-4 rounded-full transition-transform ${
+                                            waOnly ? 'translate-x-5' : 'translate-x-0'
+                                        }`} />
+                                    </div>
+                                </div>
+
                                 <button 
                                     onClick={handleTriggerResearch}
                                     className="w-full bg-primary hover:bg-primary-hover text-white font-medium py-3 rounded-xl transition-all flex items-center justify-center gap-2"
