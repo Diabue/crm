@@ -44,7 +44,6 @@ const AIProspecting: React.FC = () => {
         Closer: true
     });
 
-    const logsEndRef = useRef<HTMLDivElement>(null);
 
     // Dynamic stats
     const stats = {
@@ -55,10 +54,6 @@ const AIProspecting: React.FC = () => {
 
     const activeAgentsCount = Object.values(agentStatus).filter(Boolean).length;
 
-    // Automatyczne scrollowanie konsoli w dół
-    useEffect(() => {
-        logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [logs]);
 
     // Initial Fetch & Realtime Subscriptions
     useEffect(() => {
@@ -272,7 +267,6 @@ const AIProspecting: React.FC = () => {
                                 </div>
                             ))
                         )}
-                        <div ref={logsEndRef} />
                     </div>
                 </div>
 
