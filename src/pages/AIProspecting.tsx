@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bot, Search, Play, Activity, Terminal, CheckCircle2, RotateCw } from 'lucide-react';
+import { 
+    Bot, Search, Terminal, RotateCw, Play,
+    Users, TrendingUp, Zap, Mail, Phone, Calendar, Power, FileText,
+    MessageSquare
+} from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 type AgentLog = {
@@ -9,378 +13,500 @@ type AgentLog = {
     created_at: string;
 };
 
+type Lead = {
+    id: string;
+    company_name: string;
+    website_url: string;
+    email: string;
+    phone: string;
+    status: string;
+    created_at: string;
+};
+
 const AIProspecting: React.FC = () => {
-    const [activeTab, setActiveTab] = useState<'Dashboard' | 'Research' | 'Outreach' | 'Closer'>('Dashboard');
+    // Basic state
     const [logs, setLogs] = useState<AgentLog[]>([]);
-    
-    // Filtrowane logi dla wybranego taba
-    const filteredLogs = activeTab === 'Dashboard' 
-        ? logs 
-        : logs.filter(log => log.agent_name === activeTab);
+    const [leads, setLeads] = useState<Lead[]>([]);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [filterStatus, setFilterStatus] = useState<string>('Wszystkie');
+    const [isLoadingLeads, setIsLoadingLeads] = useState(true);
 
-    const logsEndRef = useRef<HTMLDivElement>(null);
+    // Manual Trigger States
+    const [researchTriggerQuery, setResearchTriggerQuery] = useState('');
+    const [waOnly, setWaOnly] = useState(false);
 
-    // Automatyczne scrollowanie konsoli w dół
-    useEffect(() => {
-        logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [filteredLogs]);
-
-    // Pobieranie i strumieniowanie logów
-    useEffect(() => {
-        // 1. Inicjalne pobranie ostatnich logów
-        const fetchLogs = async () => {
-            const { data } = await supabase
-                .from('agent_logs')
-                .select('*')
-                .order('created_at', { ascending: true })
-                .limit(100);
-            
-            if (data) setLogs(data);
-        };
-        fetchLogs();
-
-        // 2. Subskrypcja Realtime na żywo (nasłuchuje insert'ów bez odświeżania strony)
-        const subscription = supabase
-            .channel('agent-logs-live')
-            .on(
-                'postgres_changes',
-                { event: 'INSERT', schema: 'public', table: 'agent_logs' },
-                (payload) => {
-                    setLogs(current => [...current, payload.new as AgentLog]);
-                }
-            )
-            .subscribe((status) => {
-                if (status === 'SUBSCRIBED') {
-                    console.log('[Realtime] Połączono! Logi będą się aktualizować w czasie rzeczywistym.');
-                }
-            });
-
-        return () => {
-            supabase.removeChannel(subscription);
-        };
-    }, []);
-
-    // Agent Guidelines (Sekretny Notatnik Szefa)
+    // Agent Guideline state
     const [outreachGuideline, setOutreachGuideline] = useState('');
     const [closerGuideline, setCloserGuideline] = useState('');
-    
-    // Status włączników odcinających zasilanie
     const [agentStatus, setAgentStatus] = useState({
         Research: true,
         Outreach: true,
         Closer: true
     });
 
+    const logsEndRef = useRef<HTMLDivElement>(null);
+
+    // Dynamic stats
+    const stats = {
+        total: leads.length,
+        contacted: leads.filter(l => ['Wysłano Email', 'Gorący', 'Zamknięty'].includes(l.status)).length,
+        closed: leads.filter(l => l.status === 'Zamknięty').length
+    };
+
+    const activeAgentsCount = Object.values(agentStatus).filter(Boolean).length;
+
+    // Automatyczne scrollowanie konsoli w dół
     useEffect(() => {
-        const fetchGuidelines = async () => {
-             const { data } = await supabase.from('agent_settings').select('*');
-             if (data) {
-                 const outreach = data.find(d => d.agent_name === 'Outreach');
-                 const closer = data.find(d => d.agent_name === 'Closer');
-                 const research = data.find(d => d.agent_name === 'Research');
+        logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [logs]);
 
-                 if (outreach) setOutreachGuideline(outreach.guidelines || '');
-                 if (closer) setCloserGuideline(closer.guidelines || '');
+    // Initial Fetch & Realtime Subscriptions
+    useEffect(() => {
+        const fetchInitialData = async () => {
+            // Logs
+            const { data: logData } = await supabase
+                .from('agent_logs')
+                .select('*')
+                .order('created_at', { ascending: true })
+                .limit(100);
+            if (logData) setLogs(logData);
 
-                 setAgentStatus({
-                     Research: research ? research.is_active !== false : true,
-                     Outreach: outreach ? outreach.is_active !== false : true,
-                     Closer: closer ? closer.is_active !== false : true,
-                 });
-             }
+            // Leads
+            const { data: leadData } = await supabase
+                .from('ai_leads')
+                .select('*')
+                .order('created_at', { ascending: false });
+            if (leadData) setLeads(leadData);
+            setIsLoadingLeads(false);
+
+            // Settings
+            const { data: settingsData } = await supabase.from('agent_settings').select('*');
+            if (settingsData) {
+                const outreach = settingsData.find(d => d.agent_name === 'Outreach');
+                const closer = settingsData.find(d => d.agent_name === 'Closer');
+                const research = settingsData.find(d => d.agent_name === 'Research');
+
+                if (outreach) setOutreachGuideline(outreach.guidelines || '');
+                if (closer) setCloserGuideline(closer.guidelines || '');
+                setAgentStatus({
+                    Research: research ? research.is_active !== false : true,
+                    Outreach: outreach ? outreach.is_active !== false : true,
+                    Closer: closer ? closer.is_active !== false : true,
+                });
+            }
         };
-        fetchGuidelines();
+        fetchInitialData();
+
+        // Subscription: Logs
+        const logsSub = supabase
+            .channel('agent-logs-live')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'agent_logs' }, (payload) => {
+                setLogs(current => [...current, payload.new as AgentLog]);
+            })
+            .subscribe();
+
+        // Subscription: Leads
+        const leadsSub = supabase
+            .channel('ai-leads-live')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'ai_leads' }, (payload) => {
+                if (payload.eventType === 'INSERT') {
+                    setLeads(current => [payload.new as Lead, ...current]);
+                } else if (payload.eventType === 'UPDATE') {
+                    setLeads(current => current.map(l => l.id === payload.new.id ? payload.new as Lead : l));
+                } else if (payload.eventType === 'DELETE') {
+                    setLeads(current => current.filter(l => l.id !== payload.old.id));
+                }
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(logsSub);
+            supabase.removeChannel(leadsSub);
+        };
     }, []);
 
+    // Handlers
     const toggleAgentStatus = async (agentName: string) => {
         const current = agentStatus[agentName as keyof typeof agentStatus];
         const nextState = !current;
         setAgentStatus(prev => ({ ...prev, [agentName]: nextState }));
-        
-        try {
-            await supabase.from('agent_settings').upsert({ agent_name: agentName, is_active: nextState, updated_at: new Date().toISOString() });
-        } catch(e) {
-            console.error(e);
-        }
+        await supabase.from('agent_settings').upsert({ agent_name: agentName, is_active: nextState, updated_at: new Date().toISOString() });
     };
 
     const saveGuideline = async (agentName: string, text: string) => {
         try {
             await supabase.from('agent_settings').upsert({ agent_name: agentName, guidelines: text, updated_at: new Date().toISOString() });
-            alert(`Pomyślnie wgrano nowe myśli asystentowi: ${agentName}!`);
+            alert(`Pomyślnie wgrano nowe myśli dla Agenta: ${agentName}!`);
         } catch(e) {
-            console.error(e);
             alert("Błąd zapisu!");
         }
     };
 
-    // Research Trigger
-    const [searchQuery, setSearchQuery] = useState('');
-    const [waOnly, setWaOnly] = useState(false);
     const handleTriggerResearch = async () => {
+        if (!researchTriggerQuery.trim()) return alert("Wpisz czego szukamy!");
         try {
             const res = await fetch('https://crm-backend-production-7533.up.railway.app/api/agent/trigger-research', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ query: searchQuery, waOnly })
+                body: JSON.stringify({ query: researchTriggerQuery, waOnly })
             });
-            if (res.ok) {
-                const data = await res.json();
-                alert(data.message || `Obudziłem Research Agenta!`);
-            } else alert("Nie udało się wypuścić agenta. Czy backend żyje?");
-            setSearchQuery('');
+            if (res.ok) alert("Obudziłem Research Agenta! Rozpoczął polowanie.");
+            else alert("Błąd wywoływania agenta.");
+            setResearchTriggerQuery('');
         } catch (e) {
-            console.error(e);
-            alert("Błąd połączenia z backendem przy wywoływaniu Agenta.");
+            alert("Błąd połączenia z backendem.");
         }
     };
 
-    // Outreach Trigger
     const handleTriggerOutreach = async () => {
         try {
             const res = await fetch('https://crm-backend-production-7533.up.railway.app/api/agent/trigger-outreach', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' }
             });
-            if (res.ok) alert("Kazałem Outreach Agentowi rozejrzeć się po bazie i powysyłać zaległe maile! Zobacz logi.");
-            else alert("Błąd wywoływania Outreach Agenta.");
+            if (res.ok) alert("Wydałem rozkaz Outreach Agentowi. Powinien właśnie wysyłać maile.");
+            else alert("Błąd wywoływania agenta.");
         } catch (e) {
-            console.error(e);
             alert("Błąd połączenia z backendem.");
         }
     };
 
-    return (
-        <div className="space-y-6 h-[calc(100vh-140px)] flex flex-col">
-            <header className="flex justify-between items-center bg-surface/50 p-6 rounded-2xl border border-border flex-shrink-0">
-                <div>
-                    <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-                        <Bot className="text-primary" size={36} />
-                        MKSITES Multi-Agent System
-                    </h1>
-                    <p className="text-text-secondary mt-2">Nadzoruj pracę swoich wirtualnych pracowników SDR i przeglądaj ich logi operacyjne.</p>
-                </div>
-            </header>
+    // Filtered Leads
+    const filteredLeads = leads.filter(lead => {
+        const matchesSearch = lead.company_name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                             lead.email?.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesStatus = filterStatus === 'Wszystkie' || lead.status === filterStatus;
+        return matchesSearch && matchesStatus;
+    });
 
-            {/* Menu nawigacyjne zakładek */}
-            <div className="flex gap-2 overflow-x-auto pb-2 flex-shrink-0">
-                {['Dashboard', 'Research', 'Outreach', 'Closer'].map(tab => (
-                    <button
-                        key={tab}
-                        onClick={() => setActiveTab(tab as any)}
-                        className={`px-6 py-3 rounded-xl font-medium transition-all whitespace-nowrap flex items-center gap-2 ${
-                            activeTab === tab 
-                                ? 'bg-primary text-white shadow-lg shadow-primary/20' 
-                                : 'bg-surface text-text-secondary border border-border hover:bg-surface-hover hover:text-white'
-                        }`}
-                    >
-                        {tab === 'Dashboard' && <Activity size={18} />}
-                        {tab === 'Research' && <Search size={18} />}
-                        {tab === 'Outreach' && <Play size={18} />}
-                        {tab === 'Closer' && <CheckCircle2 size={18} />}
-                        {tab} Agent
-                    </button>
-                ))}
+    const getStatusStyles = (status: string) => {
+        switch(status) {
+            case 'Nowy': return 'bg-blue-500/10 text-blue-400 border-blue-500/30';
+            case 'Nowy WA': return 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30';
+            case 'Wysłano Email': return 'bg-purple-500/10 text-purple-400 border-purple-500/30';
+            case 'WhatsApp': return 'bg-green-500/10 text-green-400 border-green-500/30';
+            case 'Gorący': return 'bg-orange-500/10 text-orange-400 border-orange-500/30';
+            case 'Zamknięty': return 'bg-green-600/10 text-green-500 border-green-600/30';
+            default: return 'bg-gray-500/10 text-gray-400 border-gray-500/30';
+        }
+    };
+
+    return (
+        <div className="space-y-6 h-full flex flex-col p-4 bg-[#0a0a0d] overflow-y-auto">
+            
+            {/* Header */}
+            <div className="flex justify-between items-center mb-2">
+                <div className="flex items-center gap-4">
+                    <div className="bg-primary/20 p-3 rounded-2xl border border-primary/30">
+                        <Bot className="text-primary" size={32} />
+                    </div>
+                    <div>
+                        <h1 className="text-2xl font-bold text-white tracking-tight">AI Prospects</h1>
+                        <p className="text-text-secondary text-sm">Autonomous AI presales system — Research → Outreach → Closer</p>
+                    </div>
+                </div>
+                <div className={`flex items-center gap-2 px-4 py-2 rounded-full border ${activeAgentsCount > 0 ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-red-500/10 border-red-500/30 text-red-400'}`}>
+                    <div className={`w-2 h-2 rounded-full animate-pulse ${activeAgentsCount > 0 ? 'bg-green-400' : 'bg-red-400'}`} />
+                    <span className="text-xs font-bold uppercase tracking-widest">{activeAgentsCount} Agents Running</span>
+                </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-0">
-                 {/* Lewy panel akcji - zależny od taba */}
-                 <div className="lg:col-span-1 bg-surface border border-border rounded-2xl p-6 flex flex-col overflow-y-auto">
-                    
-                    {activeTab === 'Dashboard' && (
-                        <div>
-                            <h2 className="text-xl font-semibold text-white mb-6">Mini Dashboard (Master Switch)</h2>
-                            <p className="text-sm text-text-secondary mb-6">Wciśnij kolorowy przełącznik po prawej stronie, by wysłać Agenta na przymusowy urlop ze skutkiem natychmiastowym.</p>
-                            
-                            <div className="space-y-4">
-                                <div className={`p-4 border rounded-xl transition-all ${agentStatus.Research ? 'bg-background border-border' : 'bg-red-500/10 border-red-500/30'}`}>
-                                    <div className="flex justify-between items-center mb-2">
-                                        <span className={`font-medium ${agentStatus.Research ? 'text-text-secondary' : 'text-red-400 font-bold'}`}>Research Agent</span>
-                                        <button onClick={() => toggleAgentStatus('Research')} className={`px-3 py-1 text-xs rounded-full font-bold transition-all ${agentStatus.Research ? 'bg-green-500/20 text-green-400 hover:bg-red-500 hover:text-white' : 'bg-red-500 text-white hover:bg-green-500 hover:text-white'}`}>
-                                            {agentStatus.Research ? 'ON' : 'OFF'}
-                                        </button>
-                                    </div>
-                                    <div className="text-xs text-text-secondary">CRON: {agentStatus.Research ? 'Aktywny (co 6h)' : 'UŚPIONY PRZEZ SZEFA'}</div>
-                                </div>
-                                <div className={`p-4 border rounded-xl transition-all ${agentStatus.Outreach ? 'bg-background border-border' : 'bg-red-500/10 border-red-500/30'}`}>
-                                    <div className="flex justify-between items-center mb-2">
-                                        <span className={`font-medium ${agentStatus.Outreach ? 'text-text-secondary' : 'text-red-400 font-bold'}`}>Outreach Agent</span>
-                                        <button onClick={() => toggleAgentStatus('Outreach')} className={`px-3 py-1 text-xs rounded-full font-bold transition-all ${agentStatus.Outreach ? 'bg-green-500/20 text-green-400 hover:bg-red-500 hover:text-white' : 'bg-red-500 text-white hover:bg-green-500 hover:text-white'}`}>
-                                            {agentStatus.Outreach ? 'ON' : 'OFF'}
-                                        </button>
-                                    </div>
-                                    <div className="text-xs text-text-secondary">CRON: {agentStatus.Outreach ? 'Aktywny (co 1h)' : 'UŚPIONY PRZEZ SZEFA'}</div>
-                                </div>
-                                <div className={`p-4 border rounded-xl transition-all ${agentStatus.Closer ? 'bg-background border-border' : 'bg-red-500/10 border-red-500/30'}`}>
-                                    <div className="flex justify-between items-center mb-2">
-                                        <span className={`font-medium ${agentStatus.Closer ? 'text-text-secondary' : 'text-red-400 font-bold'}`}>Closer Agent</span>
-                                        <button onClick={() => toggleAgentStatus('Closer')} className={`px-3 py-1 text-xs rounded-full font-bold transition-all ${agentStatus.Closer ? 'bg-green-500/20 text-green-400 hover:bg-red-500 hover:text-white' : 'bg-red-500 text-white hover:bg-green-500 hover:text-white'}`}>
-                                            {agentStatus.Closer ? 'ON' : 'OFF'}
-                                        </button>
-                                    </div>
-                                    <div className="text-xs text-text-secondary">Webhook: {agentStatus.Closer ? 'Nasłuchuje (24/7)' : 'UŚPIONY PRZEZ SZEFA'}</div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {activeTab === 'Research' && (
-                        <div>
-                            <h2 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
-                                Kontrola Agenta Poszukującego
-                            </h2>
-                            <p className="text-sm text-text-secondary mb-6">Agent automatycznie działa co 6 godzin. Możesz tutaj wymusić jednorazowe, niespodziewane szukanie w Google Places.</p>
-                            
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="block text-sm text-text-secondary mb-1">Czego szukamy?</label>
-                                    <input 
-                                        type="text"
-                                        className="w-full bg-background border border-border rounded-xl p-3 text-white focus:outline-none focus:border-primary"
-                                        placeholder="np. Pranie tapicerek Łódź"
-                                        value={searchQuery}
-                                        onChange={(e) => setSearchQuery(e.target.value)}
-                                    />
-                                </div>
-
-                                {/* Toggle trybu WA Only */}
-                                <div
-                                    onClick={() => setWaOnly(!waOnly)}
-                                    className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all select-none ${
-                                        waOnly 
-                                            ? 'bg-green-500/10 border-green-500/40 text-green-400' 
-                                            : 'bg-background border-border text-text-secondary'
-                                    }`}
-                                >
-                                    <div>
-                                        <p className="font-medium text-sm">{waOnly ? '📱 Tylko WhatsApp' : '📧 Email + WhatsApp'}</p>
-                                        <p className="text-xs opacity-70">
-                                            {waOnly 
-                                                ? 'Szuka TYLKO firm bez strony WWW (kontakt przez WA)'
-                                                : 'Szuka wszystkich firm (email i WA)'}
-                                        </p>
-                                    </div>
-                                    <div className={`w-10 h-5 rounded-full relative transition-colors ${
-                                        waOnly ? 'bg-green-500' : 'bg-surface-hover'
-                                    }`}>
-                                        <div className={`absolute top-0.5 left-0.5 bg-white w-4 h-4 rounded-full transition-transform ${
-                                            waOnly ? 'translate-x-5' : 'translate-x-0'
-                                        }`} />
-                                    </div>
-                                </div>
-
-                                <button 
-                                    onClick={handleTriggerResearch}
-                                    className="w-full bg-primary hover:bg-primary-hover text-white font-medium py-3 rounded-xl transition-all flex items-center justify-center gap-2"
-                                >
-                                    <RotateCw size={18} /> Wymuś polowanie
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
-                    {activeTab === 'Outreach' && (
-                        <div>
-                            <h2 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
-                                Kontrola Agenta Inicjatora
-                            </h2>
-                            <p className="text-sm text-text-secondary mb-6">Wysyła z zaskoczenia maile do firm ze statusem "Nowy". Domyślnie działa co 1 godzinę.</p>
-                            
-                            <button 
-                                onClick={handleTriggerOutreach}
-                                className="w-full bg-primary hover:bg-primary-hover text-white font-medium py-3 rounded-xl transition-all flex items-center justify-center gap-2 mb-6"
-                            >
-                                <Play size={18} /> Wypuść Agenta teraz
-                            </button>
-
-                            <div className="mt-4 border-t border-border pt-6">
-                                <h3 className="text-lg font-medium text-white mb-2">Sekretny Notatnik Szefa</h3>
-                                <p className="text-xs text-text-secondary mb-3">Wpisz nowe zasady budowania e-maili. Agent weźmie je do serca.</p>
-                                <textarea 
-                                    className="w-full bg-background border border-border rounded-xl p-3 text-white focus:outline-none focus:border-primary min-h-[120px] mb-3 text-sm"
-                                    placeholder="Np. Dzisiaj próbujemy skusić ich audytem SEO za darmo, bądź bardzo luźny..."
-                                    value={outreachGuideline}
-                                    onChange={(e) => setOutreachGuideline(e.target.value)}
-                                />
-                                <button 
-                                    onClick={() => saveGuideline('Outreach', outreachGuideline)}
-                                    className="w-full bg-surface-hover border border-border text-white text-sm font-medium py-2 rounded-xl transition-all hover:bg-white hover:text-black"
-                                >
-                                    Zapisz Polecenie
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
-                    {activeTab === 'Closer' && (
-                        <div>
-                            <h2 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
-                                Closer Agent (Informacje)
-                            </h2>
-                            <p className="text-sm text-text-secondary mb-4">Ten agent nie posiada ręcznego przycisku "Start". Będzie z automatu odpalał się za każdym razem, gdy na Twoją dedykowaną skrzynkę lub bramkę SMS wpadnie wiadomość zwrotna do Resend/Twilio Webhook.</p>
-                            <div className="p-4 bg-primary/10 border border-primary/20 rounded-xl mb-6">
-                                <p className="text-sm text-primary/80">
-                                    <strong>Status:</strong> Nasłuchiwanie na kanale Webhook.
-                                </p>
-                            </div>
-
-                            <div className="mt-4 border-t border-border pt-6">
-                                <h3 className="text-lg font-medium text-white mb-2">Sekretny Notatnik Szefa</h3>
-                                <p className="text-xs text-text-secondary mb-3">Zmień sposób prowadzenia negocjacji w komunikatorach (np. prośby klienta o obniżkę).</p>
-                                <textarea 
-                                    className="w-full bg-background border border-border rounded-xl p-3 text-white focus:outline-none focus:border-primary min-h-[120px] mb-3 text-sm"
-                                    placeholder="Np. Zaczynaj wyceny od 4000 zł w górę, nie zgadzaj się na rabaty dla małych firm..."
-                                    value={closerGuideline}
-                                    onChange={(e) => setCloserGuideline(e.target.value)}
-                                />
-                                <button 
-                                    onClick={() => saveGuideline('Closer', closerGuideline)}
-                                    className="w-full bg-surface-hover border border-border text-white text-sm font-medium py-2 rounded-xl transition-all hover:bg-white hover:text-black"
-                                >
-                                    Zapisz Polecenie
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
-                 </div>
-
-                 {/* Prawy panel - Terminal */}
-                 <div className="lg:col-span-2 bg-[#0d1117] border border-border/50 rounded-2xl p-4 flex flex-col min-h-0 font-mono shadow-inner relative">
-                    {/* Header terminala */}
-                    <div className="flex items-center gap-2 mb-4 border-b border-white/10 pb-3 flex-shrink-0">
-                        <Terminal className="text-green-400" size={18} />
-                        <span className="text-sm text-gray-400 font-semibold tracking-wider uppercase">System Logs [{activeTab}]</span>
-                        <div className="flex gap-1 ml-auto">
-                            <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                            <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                            <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                        </div>
+            {/* Stat Row */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-surface/40 p-6 rounded-2xl border border-border backdrop-blur-sm flex items-center gap-4">
+                    <div className="bg-blue-500/20 p-4 rounded-xl">
+                        <Users className="text-blue-400" size={24} />
                     </div>
+                    <div>
+                        <p className="text-4xl font-bold text-white">{stats.total}</p>
+                        <p className="text-text-secondary text-sm uppercase tracking-wider font-medium">Total Prospects</p>
+                    </div>
+                </div>
+                <div className="bg-surface/40 p-6 rounded-2xl border border-border backdrop-blur-sm flex items-center gap-4">
+                    <div className="bg-green-500/20 p-4 rounded-xl">
+                        <TrendingUp className="text-green-400" size={24} />
+                    </div>
+                    <div>
+                        <p className="text-4xl font-bold text-white">{stats.contacted}</p>
+                        <p className="text-text-secondary text-sm uppercase tracking-wider font-medium">Contacted Today</p>
+                    </div>
+                </div>
+                <div className="bg-surface/40 p-6 rounded-2xl border border-border backdrop-blur-sm flex items-center gap-4">
+                    <div className="bg-purple-500/20 p-4 rounded-xl">
+                        <Zap className="text-purple-400" size={24} />
+                    </div>
+                    <div>
+                        <p className="text-4xl font-bold text-white">{stats.closed}</p>
+                        <p className="text-text-secondary text-sm uppercase tracking-wider font-medium">Deals Closed</p>
+                    </div>
+                </div>
+            </div>
 
-                    {/* Konsola Przewijana */}
-                    <div className="flex-1 overflow-y-auto space-y-3 pr-2 text-sm select-text">
-                        {filteredLogs.length === 0 ? (
-                            <div className="text-gray-500 italic flex items-center justify-center h-full">Oczekiwanie na pierwsze logi w systemie...</div>
+            {/* Main Area: Logs & Table - Fixed Height for 10 rows */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[720px] mb-4">
+                
+                {/* Left: Terminal Logs (4 columns) */}
+                <div className="lg:col-span-4 bg-[#0d1117] border border-border/50 rounded-2xl flex flex-col shadow-2xl overflow-hidden h-full">
+                    <div className="p-4 border-b border-white/10 flex items-center justify-between bg-black/20 flex-shrink-0">
+                        <div className="flex items-center gap-2">
+                            <Terminal className="text-green-400" size={18} />
+                            <span className="text-sm text-gray-400 font-bold tracking-widest uppercase">Live Agent Logs</span>
+                        </div>
+                        <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" title="Connected" />
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-4 space-y-3 font-mono text-[13px] leading-relaxed select-text scrollbar-thin scrollbar-thumb-white/10">
+                        {logs.length === 0 ? (
+                            <div className="text-white/20 italic text-center mt-20">Initializing system logs...</div>
                         ) : (
-                            filteredLogs.map(log => (
-                                <div key={log.id} className="flex hover:bg-white/5 p-1 rounded transition-colors break-words">
-                                    <span className="text-gray-500 w-[140px] flex-shrink-0">[{new Date(log.created_at).toLocaleTimeString()}]</span>
-                                    <span className={`w-[90px] font-bold flex-shrink-0 ${
+                            logs.slice(-100).map(log => (
+                                <div key={log.id} className="flex gap-3 hover:bg-white/5 pr-2 rounded transition-colors group">
+                                    <span className="text-white/30 flex-shrink-0">[{new Date(log.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'})}]</span>
+                                    <span className={`font-bold flex-shrink-0 ${
                                         log.agent_name === 'Research' ? 'text-blue-400' :
                                         log.agent_name === 'Outreach' ? 'text-purple-400' :
                                         log.agent_name === 'Closer' ? 'text-red-400' : 'text-gray-400'
                                     }`}>
-                                        {log.agent_name}
+                                        [{log.agent_name}]
                                     </span>
-                                    <span className="text-gray-300 ml-2">» {log.message}</span>
+                                    <span className="text-gray-300 break-words flex-1">{log.message}</span>
                                 </div>
                             ))
                         )}
                         <div ref={logsEndRef} />
                     </div>
-                 </div>
+                </div>
+
+                {/* Right: Table (8 columns) */}
+                <div className="lg:col-span-8 bg-surface/50 border border-border rounded-2xl flex flex-col shadow-xl overflow-hidden h-full">
+                    {/* Toolbar (Fixed) */}
+                    <div className="p-4 border-b border-border flex flex-wrap items-center gap-4 bg-background/30 backdrop-blur-md flex-shrink-0">
+                        <div className="relative flex-1 min-w-[200px]">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" size={18} />
+                            <input 
+                                type="text"
+                                placeholder="Szukaj firmy lub maila..."
+                                className="w-full bg-transparent border border-border rounded-xl pl-10 pr-4 py-2 text-sm text-white focus:outline-none focus:border-primary transition-all"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                            />
+                        </div>
+                        <div className="flex gap-1 bg-background/50 p-1 rounded-xl border border-border">
+                            {['Wszystkie', 'Nowy', 'Wysłano Email', 'Gorący', 'Zamknięty'].map(cat => (
+                                <button
+                                    key={cat}
+                                    onClick={() => setFilterStatus(cat)}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${filterStatus === cat ? 'bg-primary text-white shadow-lg' : 'text-text-secondary hover:text-white'}`}
+                                >
+                                    {cat}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Table Content (Scrollable) */}
+                    <div className="flex-1 overflow-y-auto overflow-x-auto scrollbar-thin scrollbar-thumb-white/10">
+                        <table className="w-full text-left border-collapse min-w-[600px]">
+                            <thead className="bg-black/20 text-text-secondary text-[10px] uppercase font-bold tracking-widest border-b border-border sticky top-0 z-10 backdrop-blur-md">
+                                <tr>
+                                    <th className="px-6 py-4">Firma</th>
+                                    <th className="px-6 py-4">Kontakt</th>
+                                    <th className="px-6 py-4 text-center">Status</th>
+                                    <th className="px-6 py-4 text-right">Data</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border/50">
+                                {isLoadingLeads ? (
+                                    <tr>
+                                        <td colSpan={4} className="px-6 py-20 text-center text-text-secondary italic">Loading leads database...</td>
+                                    </tr>
+                                ) : filteredLeads.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={4} className="px-6 py-20 text-center text-text-secondary italic">Brak wyników spełniających kryteria.</td>
+                                    </tr>
+                                ) : (
+                                    filteredLeads.map(lead => (
+                                        <tr key={lead.id} className="hover:bg-white/[0.02] transition-colors border-b border-border/10">
+                                            <td className="px-6 py-3">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center border border-primary/20 flex-shrink-0">
+                                                        <span className="text-primary font-bold">{lead.company_name[0]}</span>
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <div className="text-white font-semibold text-sm truncate max-w-[200px]">{lead.company_name}</div>
+                                                        <div className="text-[11px] text-text-secondary truncate max-w-[150px]">{lead.website_url || 'Brak strony'}</div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-3">
+                                                <div className="space-y-0.5">
+                                                    {lead.email && (
+                                                        <div className="flex items-center gap-1.5 text-xs text-blue-400/80">
+                                                            <Mail size={12} className="flex-shrink-0" /> <span className="truncate max-w-[140px]">{lead.email}</span>
+                                                        </div>
+                                                    )}
+                                                    {lead.phone && (
+                                                        <div className="flex items-center gap-1.5 text-xs text-text-secondary">
+                                                            <Phone size={12} className="flex-shrink-0" /> {lead.phone}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-3 text-center whitespace-nowrap">
+                                                <span className={`px-3 py-1 rounded-full text-[10px] font-bold border uppercase tracking-wider ${getStatusStyles(lead.status)}`}>
+                                                    {lead.status}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-3 text-right whitespace-nowrap">
+                                                <div className="flex items-center justify-end gap-1.5 text-xs text-text-secondary font-mono">
+                                                    <Calendar size={12} className="flex-shrink-0" /> {new Date(lead.created_at).toLocaleDateString()}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
+
+            {/* Bottom Section: Command & Control */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 pb-20">
+                
+                {/* Bot Toggles (4 columns) */}
+                <div className="md:col-span-4 space-y-6">
+                    <div className="bg-surface/50 p-6 rounded-2xl border border-border shadow-xl">
+                        <div className="flex items-center gap-2 mb-6">
+                            <Power className="text-primary" size={20} />
+                            <h2 className="text-lg font-bold text-white">Master Switches</h2>
+                        </div>
+                        <div className="space-y-4">
+                            {[
+                                { id: 'Research', desc: 'Google Places (co 6h)' },
+                                { id: 'Outreach', desc: 'Zimne Maile (co 1h)' },
+                                { id: 'Closer', desc: 'Webhook WA/Email (24/7)' }
+                            ].map(agent => (
+                                <div key={agent.id} className={`p-4 rounded-xl border transition-all ${agentStatus[agent.id as keyof typeof agentStatus] ? 'bg-background/40 border-border' : 'bg-red-500/5 border-red-500/20'}`}>
+                                    <div className="flex justify-between items-center">
+                                        <div>
+                                            <p className={`font-bold text-sm ${agentStatus[agent.id as keyof typeof agentStatus] ? 'text-white' : 'text-red-400'}`}>
+                                                {agent.id} Agent
+                                            </p>
+                                            <p className="text-[10px] text-text-secondary uppercase tracking-widest mt-1">{agent.desc}</p>
+                                        </div>
+                                        <button 
+                                            onClick={() => toggleAgentStatus(agent.id)}
+                                            className={`px-4 py-1.5 rounded-full text-[10px] font-black transition-all ${
+                                                agentStatus[agent.id as keyof typeof agentStatus] 
+                                                    ? 'bg-green-500/20 text-green-400 hover:bg-red-500 hover:text-white' 
+                                                    : 'bg-red-500 text-white hover:bg-green-500 hover:text-white'
+                                            }`}
+                                        >
+                                            {agentStatus[agent.id as keyof typeof agentStatus] ? 'ON' : 'OFF'}
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Quick Manual Actions */}
+                    <div className="bg-surface/50 p-6 rounded-2xl border border-border shadow-xl space-y-6">
+                        <div className="flex items-center gap-2 mb-2">
+                            <Zap className="text-orange-400" size={20} />
+                            <h2 className="text-lg font-bold text-white">Quick Actions</h2>
+                        </div>
+                        
+                        {/* Research Trigger */}
+                        <div className="space-y-3">
+                            <label className="text-[10px] font-bold text-text-secondary uppercase tracking-widest">Wymuś poszukiwania (Research)</label>
+                            <div className="flex gap-2">
+                                <input 
+                                    type="text"
+                                    placeholder="np. Restauracje Warszawa"
+                                    className="flex-1 bg-black/40 border border-border rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-primary"
+                                    value={researchTriggerQuery}
+                                    onChange={(e) => setResearchTriggerQuery(e.target.value)}
+                                />
+                                <button 
+                                    onClick={handleTriggerResearch}
+                                    className="bg-primary hover:bg-primary-hover p-2.5 rounded-xl text-white transition-all shadow-lg shadow-primary/20"
+                                    title="Szukaj teraz"
+                                >
+                                    <RotateCw size={16} />
+                                </button>
+                            </div>
+                            <label className="flex items-center gap-2 cursor-pointer group">
+                                <input 
+                                    type="checkbox" 
+                                    className="hidden" 
+                                    checked={waOnly}
+                                    onChange={(e) => setWaOnly(e.target.checked)}
+                                />
+                                <div className={`w-3 h-3 rounded border transition-all ${waOnly ? 'bg-green-500 border-green-500' : 'border-border group-hover:border-primary'}`} />
+                                <span className="text-[10px] text-text-secondary group-hover:text-white transition-colors">Tylko firmy z WhatsApp (bez WWW)</span>
+                            </label>
+                        </div>
+
+                        {/* Outreach Trigger */}
+                        <div className="pt-4 border-t border-border/50 space-y-3">
+                            <label className="text-[10px] font-bold text-text-secondary uppercase tracking-widest">Wymuś kontakt (Outreach)</label>
+                            <button 
+                                onClick={handleTriggerOutreach}
+                                className="w-full bg-surface-hover hover:bg-white hover:text-black py-2.5 rounded-xl border border-border text-[11px] font-bold transition-all flex items-center justify-center gap-2"
+                            >
+                                <Play size={14} /> Wyślij maile do "Nowych"
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Custom Guidelines (8 columns) */}
+                <div className="md:col-span-8 bg-surface/50 p-6 rounded-2xl border border-border shadow-xl">
+                    <div className="flex items-center gap-2 mb-6">
+                        <FileText className="text-primary" size={20} />
+                        <h2 className="text-lg font-bold text-white">Sekretny Notatnik Szefa</h2>
+                    </div>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="space-y-3">
+                            <label className="text-xs font-bold text-text-secondary uppercase tracking-widest flex items-center gap-2">
+                                <Mail size={14} className="text-purple-400" /> Outreach Rules
+                            </label>
+                            <textarea 
+                                className="w-full bg-[#0d0d12] border border-border rounded-xl p-4 text-sm text-gray-300 focus:outline-none focus:border-primary min-h-[160px] resize-none leading-relaxed"
+                                placeholder="Wpisz instrukcje dla Agenta wysyłającego pierwsze maile..."
+                                value={outreachGuideline}
+                                onChange={(e) => setOutreachGuideline(e.target.value)}
+                            />
+                            <button 
+                                onClick={() => saveGuideline('Outreach', outreachGuideline)}
+                                className="w-full bg-surface-hover hover:bg-white hover:text-black py-2.5 rounded-xl border border-border text-xs font-bold transition-all flex items-center justify-center gap-2"
+                            >
+                                <Zap size={14} /> Update Outreach AI
+                            </button>
+                        </div>
+                        <div className="space-y-3">
+                            <label className="text-xs font-bold text-text-secondary uppercase tracking-widest flex items-center gap-2">
+                                <MessageSquare size={14} className="text-red-400" /> Closer Rules
+                            </label>
+                            <textarea 
+                                className="w-full bg-[#0d0d12] border border-border rounded-xl p-4 text-sm text-gray-300 focus:outline-none focus:border-primary min-h-[160px] resize-none leading-relaxed"
+                                placeholder="Wpisz instrukcje dla Agenta prowadzącego rozmowy..."
+                                value={closerGuideline}
+                                onChange={(e) => setCloserGuideline(e.target.value)}
+                            />
+                            <button 
+                                onClick={() => saveGuideline('Closer', closerGuideline)}
+                                className="w-full bg-surface-hover hover:bg-white hover:text-black py-2.5 rounded-xl border border-border text-xs font-bold transition-all flex items-center justify-center gap-2"
+                            >
+                                <Zap size={14} /> Update Closer AI
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
         </div>
     );
 };
