@@ -1,23 +1,56 @@
-# React + Vite
+# CRM Dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Panel CRM do zarządzania klientami, szansami sprzedażowymi i zadaniami. Łączy przegląd wyników sprzedaży z integracją Gmail oraz widokiem leadów i aktywności agentów AI.
 
-Currently, two official plugins are available:
+**React · TypeScript · Vite · Tailwind CSS · Supabase**
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Przegląd sprzedaży
 
-## React Compiler
+Przychody, aktywne szanse, skuteczność sprzedaży i nowe leady w jednym widoku. Wykres pokazuje wyniki w ujęciu miesięcznym.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+![Dashboard z metrykami sprzedaży, wykresem przychodów i ostatnią aktywnością](docs/screenshots/dashboard.jpg)
 
-## Expanding the ESLint configuration
+*Wszystkie zrzuty przedstawiają aplikację uruchomioną lokalnie z fikcyjnymi danymi.*
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Pipeline sprzedażowy
 
-## Deployment
+Przenoś transakcje między kolumnami **Active**, **Won** i **Lost** lub przełącz się na listę.
 
-This project is deployed on Cloudflare Pages.
+![Tablica transakcji z kolumnami dla szans aktywnych, wygranych i przegranych](docs/screenshots/deals-pipeline.jpg)
 
-### Recent Updates
-- **Gmail Integration**: Fixed type definitions and error handling for Gmail connection.
+## Klienci i leady
+
+Wyszukuj kontakty, filtruj je według statusu i otwieraj szczegóły klienta. Powiązane zadania można przeglądać również w osobnym widoku listy lub kalendarza.
+
+![Lista klientów z wyszukiwarką, filtrami i statusami kontaktów](docs/screenshots/customers.jpg)
+
+## AI Prospects
+
+Monitoruj pracę agentów **Research**, **Outreach** i **Closer** oraz przeglądaj leady według statusu. Widok korzysta z Supabase Realtime do aktualizacji logów i leadów.
+
+![AI Prospects z metrykami, logami agentów i tabelą leadów](docs/screenshots/ai-prospects.jpg)
+
+## Uruchomienie lokalne
+
+Potrzebujesz Node.js 22.12 lub nowszego, npm oraz skonfigurowanego projektu Supabase z kontem użytkownika i tabelami CRM. Katalog `supabase/migrations` zawiera migrację szablonów wiadomości. Pozostałe tabele muszą istnieć w podłączonym projekcie.
+
+```bash
+git clone https://github.com/Diabue/crm.git
+cd crm
+npm ci
+```
+
+Utwórz plik `.env` w głównym katalogu i ustaw publiczne dane projektu Supabase używane przez aplikację przeglądarkową.
+
+```dotenv
+VITE_SUPABASE_URL=
+VITE_SUPABASE_ANON_KEY=
+```
+
+Integracja poczty Gmail korzysta dodatkowo z `VITE_GOOGLE_CLIENT_ID` i `VITE_GOOGLE_API_KEY`. Analiza wiadomości przez Gemini korzysta z `VITE_GEMINI_API_KEY`.
+
+```bash
+npm run dev
+```
+
+Dashboard będzie dostępny pod adresem [localhost:5174](http://localhost:5174). Komenda `npm run build` zapisuje wersję produkcyjną w `dist/`.
